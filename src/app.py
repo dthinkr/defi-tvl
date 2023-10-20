@@ -4,6 +4,8 @@ import pandas as pd
 
 long_df = pd.read_csv('data/tvl/cache/df_long.csv')
 
+st.write("# DeFi TVL")
+
 st.write("### Normalized Stacked Area Chart")
 chart_normalized = alt.Chart(long_df).mark_area().encode(
     x="date:T",
