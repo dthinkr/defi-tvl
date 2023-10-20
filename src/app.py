@@ -2,61 +2,79 @@ import streamlit as st
 import altair as alt
 import pandas as pd
 
-long_df = pd.read_csv('data/tvl/cache/df_long.csv')
+def load_data():
+    long_df = pd.read_csv('data/tvl/cache/df_long.csv')
+    category_df = pd.read_csv('data/tvl/cache/category.csv')
+    return long_df, category_df
 
-long_df['totalLiquidityUSD'] = long_df.groupby('type')['totalLiquidityUSD'].transform(lambda x: x.rolling(window=14).mean()).fillna(0)
+def prepare_long_df(long_df):
+    long_df['totalLiquidityUSD'] = long_df.groupby('type')['totalLiquidityUSD'].transform(lambda x: x.rolling(window=14).mean()).fillna(0)
+    return long_df
 
-st.write("# DeFi TVL")
+def create_stacked_area_chart(data, normalize=False):
+    y_encoding = alt.Y("totalLiquidityUSD:Q", stack=True, axis=alt.Axis(format='.0f', title='Total Liquidity (in billions)'))
+    if normalize:
+        y_encoding.stack = "normalize"
+        title = "Normalized Stacked Area Chart"
+    else:
+        title = "Stacked Area Chart"
+        
+    chart = alt.Chart(data).mark_area().encode(
+        x="date:T",
+        y=y_encoding,
+        color=alt.Color("type:N", title="Type"),  
+        tooltip=['date', 'type', 'totalLiquidityUSD']
+    ).properties(
+        title=title
+    )
+    return chart
 
-st.write("### Normalized Stacked Area Chart")
-chart_normalized = alt.Chart(long_df).mark_area().encode(
-    x="date:T",
-    y=alt.Y("totalLiquidityUSD:Q", stack="normalize", axis=alt.Axis(format='.0f', title='Total Liquidity (in billions)')),
-    color="type:N",
-    tooltip=['date', 'type', 'totalLiquidityUSD']
-)
-st.altair_chart(chart_normalized, use_container_width=True)
+def create_chain_chart(category_df):
+    chain_counts = category_df['chain'].value_counts()
+    filtered_chain_counts = chain_counts[chain_counts >= 30]
+    chain_df = filtered_chain_counts.reset_index()
+    chain_df.columns = ['Chain', 'ProjectCount']
 
-st.write("### Non-Normalized Stacked Area Chart")
-chart_non_normalized = alt.Chart(long_df).mark_area().encode(
-    x="date:T",
-    y=alt.Y("totalLiquidityUSD:Q", stack=True, axis=alt.Axis(format='.0f', title='Total Liquidity (in billions)')),
-    color="type:N",
-    tooltip=['date', 'type', 'totalLiquidityUSD']
-)
-st.altair_chart(chart_non_normalized, use_container_width=True)
+    chart = alt.Chart(chain_df).mark_bar().encode(
+        x=alt.X('Chain:O', title='Chain', sort='-y'),
+        y=alt.Y('ProjectCount:Q', title='Number of Projects'),
+        tooltip=['Chain', 'ProjectCount']
+    ).properties(
+        title='Distribution of Projects Across Different Chains',
+        width=600,
+        height=400
+    )
+    return chart
 
-category_df = pd.read_csv('data/tvl/cache/category.csv')
-chain_counts = category_df['chain'].value_counts()
-filtered_chain_counts = chain_counts[chain_counts >= 10]
+def create_pie_chart(category_df):
+    type_counts = category_df['type'].value_counts().reset_index()
+    type_counts.columns = ['Type', 'Count']  
+    chart = alt.Chart(type_counts).mark_arc(innerRadius=0).encode(
+        theta='Count:Q',
+        color=alt.Color('Type:N', title='Type'), 
+        tooltip=['Type', 'Count']
+    ).properties(
+        title='Distribution of Entities by Type',
+        width=400,
+        height=400
+    )
+    return chart
 
-# Reset index and rename columns for clarity
-chain_df = filtered_chain_counts.reset_index()
-chain_df.columns = ['Chain', 'ProjectCount']
+def main():
+    st.write("# DeFi TVL")
 
-chain_chart = alt.Chart(chain_df).mark_bar().encode(
-    x=alt.X('Chain:O', title='Chain', sort='-y'),
-    y=alt.Y('ProjectCount:Q', title='Number of Projects'),
-    tooltip=['Chain', 'ProjectCount']
-).properties(
-    title='Distribution of Projects Across Different Chains',
-    width=600,
-    height=400
-)
+    long_df, category_df = load_data()
+    long_df = prepare_long_df(long_df)
 
-st.write("### Distribution of Projects Across Different Chains")
-st.altair_chart(chain_chart, use_container_width=True)
+    st.write("### TVL")
+    st.altair_chart(create_stacked_area_chart(long_df, normalize=True), use_container_width=True)
+    st.altair_chart(create_stacked_area_chart(long_df), use_container_width=True)
 
-percentage_distribution = (filtered_chain_counts / filtered_chain_counts.sum()) * 100
-percentage_chart = alt.Chart(pd.DataFrame(percentage_distribution.reset_index())).mark_bar().encode(
-    x=alt.X('index:O', title='Chain', sort='-y'),
-    y=alt.Y('0:Q', title='Percentage of Projects (%)'),
-    tooltip=['index', '0']
-).properties(
-    title='Percentage Distribution of Projects Across Different Chains',
-    width=600,
-    height=400
-)
+    st.write("### Types")
+    st.altair_chart(create_pie_chart(category_df), use_container_width=True)
 
-st.write("### Percentage Distribution of Projects Across Different Chains")
-st.altair_chart(percentage_chart, use_container_width=True)
+    st.write("### Chains")
+    st.altair_chart(create_chain_chart(category_df), use_container_width=True)
+
+
+main()
