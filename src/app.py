@@ -2,6 +2,7 @@ import streamlit as st
 import altair as alt
 import pandas as pd
 
+@st.cache_data
 def load_data():
     long_df = pd.read_csv('data/tvl/cache/df_long.csv')
     category_df = pd.read_csv('data/tvl/cache/category.csv')
