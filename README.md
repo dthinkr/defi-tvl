@@ -1,3 +1,3 @@
-# defi_TVL
+# defi-tvl
 
-plots a seires of charts based on DeFiLLMA data. 
+Plots a seires of charts based on DeFiLLMA data. 
