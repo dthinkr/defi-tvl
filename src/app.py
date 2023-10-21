@@ -7,7 +7,20 @@ import streamlit as st
 def load_data():
     long_df = pd.read_csv("data/tvl/cache/db_tvl_long.csv")
     category_df = pd.read_csv("data/tvl/cache/db_category.csv")
-    return long_df, category_df
+    original_data = pd.read_csv(
+        "data/tvl/cache/chain-dataset-All-doublecounted=true.csv"
+    )
+    return long_df, category_df, original_data
+
+
+# @st.cache_data
+# def prepare_original_data(original_data, category_df):
+#     melted_data = original_data.melt(id_vars=["Protocol"], var_name="date", value_name="totalLiquidityUSD")
+#     merged_data = melted_data.merge(category_df[['name', 'type']], left_on='Protocol', right_on='name', how='left')
+#     merged_data = merged_data[~merged_data['type'].isnull()]
+#     aggregated_data = merged_data.groupby(['type', 'date'])['totalLiquidityUSD'].sum().reset_index()
+#     aggregated_data['totalLiquidityUSD'] = aggregated_data['totalLiquidityUSD'] / 1e9
+#     return aggregated_data
 
 
 def prepare_long_df(long_df):
@@ -20,8 +33,7 @@ def prepare_long_df(long_df):
 
 
 def create_stacked_area_chart(data, normalize=False):
-    # Define selections
-    selection = alt.selection_multi(fields=['type'], bind='legend')
+    selection = alt.selection_point(fields=["type"], bind="legend")
     interval = alt.selection_interval()
 
     y_encoding = alt.Y(
@@ -46,9 +58,10 @@ def create_stacked_area_chart(data, normalize=False):
             tooltip=["date", "type", "totalLiquidityUSD"],
         )
         .properties(title=title)
-        .add_selection(selection, interval)
+        .add_params(selection, interval)  # Updated from add_selection to add_params
     )
     return chart
+
 
 def create_chain_chart(category_df):
     chain_counts = category_df["chain"].value_counts()
@@ -92,20 +105,26 @@ def create_pie_chart(category_df):
 def main():
     st.write("# DeFi TVL")
 
-    long_df, category_df = load_data()
+    long_df, category_df, original_data = load_data()
     long_df = prepare_long_df(long_df)
 
     st.write("### TVL")
+    st.markdown("Source: API -> Processed Data, Double Counted<sup><a href='#footnote1'>1</a></sup>", unsafe_allow_html=True)
     st.altair_chart(
         create_stacked_area_chart(long_df, normalize=True), use_container_width=True
     )
     st.altair_chart(create_stacked_area_chart(long_df), use_container_width=True)
+
+    # original_data = prepare_original_data(original_data, category_df)
+    # st.altair_chart(create_stacked_area_chart(original_data), use_container_width=True)
 
     st.write("### Types")
     st.altair_chart(create_pie_chart(category_df), use_container_width=True)
 
     st.write("### Chains")
     st.altair_chart(create_chain_chart(category_df), use_container_width=True)
+
+    st.markdown("<sup id='footnote1'>1</sup> Excluding double counting is possible on chain-level, but it is not possible on protocol-level.", unsafe_allow_html=True)
 
 
 main()
