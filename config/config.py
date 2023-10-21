@@ -10,7 +10,7 @@ category_mapping = {
         "Reserve Currency",
         "Synthetics",
         "Yield",
-        "Yield Aggregator"
+        "Yield Aggregator",
     ],
     "Trading & Exchanges": [
         "Bridge",
@@ -20,7 +20,7 @@ category_mapping = {
         "Derivatives",
         "Options",
         "Options Vault",
-        "NFT Marketplace"
+        "NFT Marketplace",
     ],
     "Lending, Borrowing & Real World Assets": [
         "CDP",
@@ -29,7 +29,7 @@ category_mapping = {
         "NFT Lending",
         "RWA Lending",
         "Uncollateralized Lending",
-        "RWA"
+        "RWA",
     ],
     "Infrastructure, Services & Financial Products": [
         "Chain",
@@ -43,10 +43,10 @@ category_mapping = {
         "Insurance",
         "Launchpad",
         "Prediction Market",
-        "Staking Pool"
+        "Staking Pool",
     ],
     "Privacy & Security": ["Privacy"],
-    "Others": ["SoFi"]
+    "Others": ["SoFi"],
 }
 
 json_files_dir = DATA_DIR + "tvl/"
