@@ -1,5 +1,6 @@
 import sys
 import os
+
 sys.path.append(os.getcwd())
 
 import altair as alt
@@ -9,6 +10,7 @@ import streamlit.components.v1 as components
 from config.config import CACHE_DIR
 import networkx as nx
 from pyvis.network import Network
+
 
 @st.cache_data
 def load_data():
@@ -20,6 +22,7 @@ def load_data():
     edges_df = pd.read_csv(CACHE_DIR + "edges_df.csv")
     return tvl_by_type, category_df, chain_dc_true, nodes_df, edges_df
 
+
 def prepare_tvl_by_type(tvl_by_type):
     """Calculate the rolling mean for TVL by type data."""
     tvl_by_type["totalLiquidityUSD"] = (
@@ -28,6 +31,7 @@ def prepare_tvl_by_type(tvl_by_type):
         .fillna(0)
     )
     return tvl_by_type
+
 
 def create_stacked_area_chart(data, normalize=False):
     """Visualize stacked area charts."""
@@ -101,33 +105,45 @@ def create_pie_chart(category_df):
     )
     return chart
 
-@st.cache_data(ttl=None, max_entries=10, show_spinner=True)
+
+@st.cache_data
 def create_network_chart(nodes_df, edges_df, percentage=100, selected_nodes=None):
     """An interactive network chart using pyvis."""
     num_nodes = int(len(nodes_df) * percentage / 100)
-    top_nodes = nodes_df.nlargest(num_nodes, 'size')
-    filtered_edges = edges_df[edges_df['source'].isin(top_nodes['name']) & edges_df['target'].isin(top_nodes['name'])]
+    top_nodes = nodes_df.nlargest(num_nodes, "size")
+    filtered_edges = edges_df[
+        edges_df["source"].isin(top_nodes["name"])
+        & edges_df["target"].isin(top_nodes["name"])
+    ]
 
-    G = nx.from_pandas_edgelist(filtered_edges, 'source', 'target', ['weight'], create_using=nx.DiGraph())
+    G = nx.from_pandas_edgelist(
+        filtered_edges, "source", "target", ["weight"], create_using=nx.DiGraph()
+    )
+    node_sizes = nodes_df.set_index("name")["size"].to_dict()
+    for node in G.nodes():
+        G.nodes[node]["size"] = node_sizes.get(node, min(node_sizes.values()))
 
-    nt = Network(notebook=True, directed=True) 
+    nt = Network(notebook=True, directed=True)
     nt.from_nx(G)
-    
+    for node in nt.nodes:
+        node["value"] = G.nodes[node["label"]]["size"]
+
     if selected_nodes:
         for node in nt.nodes:
             if node["label"] in selected_nodes:
-                node["color"] = "#FF0000"  
-    
+                node["color"] = "#FF0000"
+
     try:
-        path = '/tmp'
-        nt.save_graph(f'{path}/pyvis_graph.html')
-        HtmlFile = open(f'{path}/pyvis_graph.html', 'r', encoding='utf-8')
+        path = "/tmp"
+        nt.save_graph(f"{path}/pyvis_graph.html")
+        HtmlFile = open(f"{path}/pyvis_graph.html", "r", encoding="utf-8")
     except:
-        path = '/html_files'
-        nt.save_graph(f'{path}/pyvis_graph.html')
-        HtmlFile = open(f'{path}/pyvis_graph.html', 'r', encoding='utf-8')
+        path = "/html_files"
+        nt.save_graph(f"{path}/pyvis_graph.html")
+        HtmlFile = open(f"{path}/pyvis_graph.html", "r", encoding="utf-8")
 
     components.html(HtmlFile.read(), height=435)
+
 
 def main():
     """Execute the Streamlit app."""
@@ -137,7 +153,10 @@ def main():
     tvl_by_type = prepare_tvl_by_type(tvl_by_type)
 
     st.write("### TVL")
-    st.markdown("Source: API -> Processed Data, Double Counted<sup><a href='#footnote1'>1</a></sup>", unsafe_allow_html=True)
+    st.markdown(
+        "Source: API -> Processed Data, Double Counted<sup><a href='#footnote1'>1</a></sup>",
+        unsafe_allow_html=True,
+    )
     st.altair_chart(
         create_stacked_area_chart(tvl_by_type, normalize=True), use_container_width=True
     )
@@ -150,14 +169,20 @@ def main():
     st.altair_chart(create_chain_chart(category_df), use_container_width=True)
 
     st.write("### Network Plot of Protocols and Tokens")
-    percentage = st.slider('Percentage of Nodes Displayed', min_value=10, max_value=100, value=100)
+    percentage = st.slider(
+        "Percentage of Nodes Displayed", min_value=10, max_value=100, value=100
+    )
 
-    node_names = nodes_df['name'].unique().tolist()
+    node_names = nodes_df["name"].unique().tolist()
     node_names.sort()
-    
-    selected_nodes = st.multiselect('Select node(s) to highlight', node_names)
+
+    selected_nodes = st.multiselect("Select node(s) to highlight", node_names)
     create_network_chart(nodes_df, edges_df, percentage, selected_nodes)
 
-    st.markdown("<sup id='footnote1'>1</sup> Excluding double counting is possible on chain-level, but it is not possible on protocol-level.", unsafe_allow_html=True)
+    st.markdown(
+        "<sup id='footnote1'>1</sup> Excluding double counting is possible on chain-level, but it is not possible on protocol-level.",
+        unsafe_allow_html=True,
+    )
+
 
 main()
