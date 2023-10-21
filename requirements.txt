@@ -1,0 +1,7 @@
+altair==5.1.2
+duckdb==0.9.1
+pandas==2.1.1
+Requests==2.31.0
+simplejson==3.19.2
+streamlit==1.27.2
+tqdm==4.66.1
