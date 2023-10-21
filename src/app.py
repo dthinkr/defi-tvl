@@ -5,8 +5,8 @@ import streamlit as st
 
 @st.cache_data
 def load_data():
-    long_df = pd.read_csv("data/tvl/cache/df_long.csv")
-    category_df = pd.read_csv("data/tvl/cache/category.csv")
+    long_df = pd.read_csv("data/tvl/cache/db_tvl_long.csv")
+    category_df = pd.read_csv("data/tvl/cache/db_category.csv")
     return long_df, category_df
 
 
