@@ -4,10 +4,17 @@ import os
 sys.path.append(os.getcwd())
 
 import altair as alt
+
 import pandas as pd
+
+# import pandas_profiling
+# from streamlit_pandas_profiling import st_profile_report
+
 import streamlit as st
 import streamlit.components.v1 as components
+
 from config.config import CACHE_DIR
+
 import networkx as nx
 from pyvis.network import Network
 
@@ -179,10 +186,13 @@ def main():
     selected_nodes = st.multiselect("Select node(s) to highlight", node_names)
     create_network_chart(nodes_df, edges_df, percentage, selected_nodes)
 
+    # st_profile_report(category_df.profile_report())
+
     st.markdown(
         "<sup id='footnote1'>1</sup> Excluding double counting is possible on chain-level, but it is not possible on protocol-level.",
         unsafe_allow_html=True,
     )
 
 
-main()
+if __name__ == "__main__":
+    main()
