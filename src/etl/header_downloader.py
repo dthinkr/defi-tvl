@@ -1,9 +1,11 @@
-
 # downloader.py
-import requests
 import json
 import os
+
+import requests
+
 from config import DATA_DIR
+
 
 class BaseDownloader:
     def __init__(self, url, filename):
@@ -19,17 +21,22 @@ class BaseDownloader:
             return None
 
     def save_data_to_file(self, data):
-        with open(self.filename, 'w') as f:
+        with open(self.filename, "w") as f:
             json.dump(data, f, indent=4)
+
 
 class ProtocolDownloader(BaseDownloader):
     def __init__(self):
-        super().__init__("https://api.llama.fi/protocols", os.path.join(DATA_DIR, "protocol_headers.json"))
+        super().__init__(
+            "https://api.llama.fi/protocols",
+            os.path.join(DATA_DIR, "protocol_headers.json"),
+        )
+
 
 if __name__ == "__main__":
     downloader = ProtocolDownloader()
     data = downloader.fetch_data()
-    
+
     if data:
         downloader.save_data_to_file(data)
         print(f"Data saved to {downloader.filename}")
