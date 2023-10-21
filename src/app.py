@@ -150,7 +150,7 @@ def main():
     st.altair_chart(create_chain_chart(category_df), use_container_width=True)
 
     st.write("### Network Plot of Protocols and Tokens")
-    percentage = st.slider('Percentage of Nodes Displayed', min_value=10, max_value=100, value=50)
+    percentage = st.slider('Percentage of Nodes Displayed', min_value=10, max_value=100, value=100)
 
     node_names = nodes_df['name'].unique().tolist()
     node_names.sort()
