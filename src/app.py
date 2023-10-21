@@ -1,38 +1,36 @@
+import sys
+import os
+sys.path.append(os.getcwd())
+
 import altair as alt
 import pandas as pd
 import streamlit as st
-
+import streamlit.components.v1 as components
+from config.config import CACHE_DIR
+import networkx as nx
+from pyvis.network import Network
 
 @st.cache_data
 def load_data():
-    long_df = pd.read_csv("data/tvl/cache/db_tvl_long.csv")
-    category_df = pd.read_csv("data/tvl/cache/db_category.csv")
-    original_data = pd.read_csv(
-        "data/tvl/cache/chain-dataset-All-doublecounted=true.csv"
-    )
-    return long_df, category_df, original_data
+    """Load datasets from cache and return as DataFrames."""
+    tvl_by_type = pd.read_csv(CACHE_DIR + "db_tvl_long.csv")
+    category_df = pd.read_csv(CACHE_DIR + "db_category.csv")
+    chain_dc_true = pd.read_csv(CACHE_DIR + "chain-dataset-All-doublecounted=true.csv")
+    nodes_df = pd.read_csv(CACHE_DIR + "nodes_df.csv")
+    edges_df = pd.read_csv(CACHE_DIR + "edges_df.csv")
+    return tvl_by_type, category_df, chain_dc_true, nodes_df, edges_df
 
-
-# @st.cache_data
-# def prepare_original_data(original_data, category_df):
-#     melted_data = original_data.melt(id_vars=["Protocol"], var_name="date", value_name="totalLiquidityUSD")
-#     merged_data = melted_data.merge(category_df[['name', 'type']], left_on='Protocol', right_on='name', how='left')
-#     merged_data = merged_data[~merged_data['type'].isnull()]
-#     aggregated_data = merged_data.groupby(['type', 'date'])['totalLiquidityUSD'].sum().reset_index()
-#     aggregated_data['totalLiquidityUSD'] = aggregated_data['totalLiquidityUSD'] / 1e9
-#     return aggregated_data
-
-
-def prepare_long_df(long_df):
-    long_df["totalLiquidityUSD"] = (
-        long_df.groupby("type")["totalLiquidityUSD"]
+def prepare_tvl_by_type(tvl_by_type):
+    """Calculate the rolling mean for TVL by type data."""
+    tvl_by_type["totalLiquidityUSD"] = (
+        tvl_by_type.groupby("type")["totalLiquidityUSD"]
         .transform(lambda x: x.rolling(window=14).mean())
         .fillna(0)
     )
-    return long_df
-
+    return tvl_by_type
 
 def create_stacked_area_chart(data, normalize=False):
+    """Visualize stacked area charts."""
     selection = alt.selection_point(fields=["type"], bind="legend")
     interval = alt.selection_interval()
 
@@ -64,6 +62,7 @@ def create_stacked_area_chart(data, normalize=False):
 
 
 def create_chain_chart(category_df):
+    """Visualize project distribution across chains."""
     chain_counts = category_df["chain"].value_counts()
     filtered_chain_counts = chain_counts[chain_counts >= 30]
     chain_df = filtered_chain_counts.reset_index()
@@ -87,6 +86,7 @@ def create_chain_chart(category_df):
 
 
 def create_pie_chart(category_df):
+    """A pie chart for entity distribution by type."""
     type_counts = category_df["type"].value_counts().reset_index()
     type_counts.columns = ["Type", "Count"]
     chart = (
@@ -101,22 +101,47 @@ def create_pie_chart(category_df):
     )
     return chart
 
+@st.cache_data(ttl=None, max_entries=10, show_spinner=True)
+def create_network_chart(nodes_df, edges_df, percentage=100, selected_nodes=None):
+    """An interactive network chart using pyvis."""
+    num_nodes = int(len(nodes_df) * percentage / 100)
+    top_nodes = nodes_df.nlargest(num_nodes, 'size')
+    filtered_edges = edges_df[edges_df['source'].isin(top_nodes['name']) & edges_df['target'].isin(top_nodes['name'])]
+
+    G = nx.from_pandas_edgelist(filtered_edges, 'source', 'target', ['weight'], create_using=nx.DiGraph())
+
+    nt = Network(notebook=True, directed=True) 
+    nt.from_nx(G)
+    
+    if selected_nodes:
+        for node in nt.nodes:
+            if node["label"] in selected_nodes:
+                node["color"] = "#FF0000"  
+    
+    try:
+        path = '/tmp'
+        nt.save_graph(f'{path}/pyvis_graph.html')
+        HtmlFile = open(f'{path}/pyvis_graph.html', 'r', encoding='utf-8')
+    except:
+        path = '/html_files'
+        nt.save_graph(f'{path}/pyvis_graph.html')
+        HtmlFile = open(f'{path}/pyvis_graph.html', 'r', encoding='utf-8')
+
+    components.html(HtmlFile.read(), height=435)
 
 def main():
+    """Execute the Streamlit app."""
     st.write("# DeFi TVL")
 
-    long_df, category_df, original_data = load_data()
-    long_df = prepare_long_df(long_df)
+    tvl_by_type, category_df, chain_dc_true, nodes_df, edges_df = load_data()
+    tvl_by_type = prepare_tvl_by_type(tvl_by_type)
 
     st.write("### TVL")
     st.markdown("Source: API -> Processed Data, Double Counted<sup><a href='#footnote1'>1</a></sup>", unsafe_allow_html=True)
     st.altair_chart(
-        create_stacked_area_chart(long_df, normalize=True), use_container_width=True
+        create_stacked_area_chart(tvl_by_type, normalize=True), use_container_width=True
     )
-    st.altair_chart(create_stacked_area_chart(long_df), use_container_width=True)
-
-    # original_data = prepare_original_data(original_data, category_df)
-    # st.altair_chart(create_stacked_area_chart(original_data), use_container_width=True)
+    st.altair_chart(create_stacked_area_chart(tvl_by_type), use_container_width=True)
 
     st.write("### Types")
     st.altair_chart(create_pie_chart(category_df), use_container_width=True)
@@ -124,7 +149,15 @@ def main():
     st.write("### Chains")
     st.altair_chart(create_chain_chart(category_df), use_container_width=True)
 
-    st.markdown("<sup id='footnote1'>1</sup> Excluding double counting is possible on chain-level, but it is not possible on protocol-level.", unsafe_allow_html=True)
+    st.write("### Network Plot of Protocols and Tokens")
+    percentage = st.slider('Percentage of Nodes Displayed', min_value=10, max_value=100, value=50)
 
+    node_names = nodes_df['name'].unique().tolist()
+    node_names.sort()
+    
+    selected_nodes = st.multiselect('Select node(s) to highlight', node_names)
+    create_network_chart(nodes_df, edges_df, percentage, selected_nodes)
+
+    st.markdown("<sup id='footnote1'>1</sup> Excluding double counting is possible on chain-level, but it is not possible on protocol-level.", unsafe_allow_html=True)
 
 main()

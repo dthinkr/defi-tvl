@@ -1,5 +1,9 @@
 # config.py
-DATA_DIR = "../data/"
+# DATA_DIR = "../data/"
+# json_files_dir = DATA_DIR + "tvl/"
+# protocol_headers_path = DATA_DIR + "headers/protocol_headers.json"
+
+CACHE_DIR = "data/tvl/cache/"
 
 category_mapping = {
     "Asset Management": [
@@ -49,6 +53,3 @@ category_mapping = {
     "Others": ["SoFi"],
 }
 
-json_files_dir = DATA_DIR + "tvl/"
-
-protocol_headers_path = DATA_DIR + "headers/protocol_headers.json"
