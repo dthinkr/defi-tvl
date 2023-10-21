@@ -154,7 +154,7 @@ def create_network_chart(nodes_df, edges_df, percentage=100, selected_nodes=None
 
 def main():
     """Execute the Streamlit app."""
-    st.write("# DeFi TVL")
+    st.write("# DeFi TVL Test")
 
     tvl_by_type, category_df, chain_dc_true, nodes_df, edges_df = load_data()
     tvl_by_type = prepare_tvl_by_type(tvl_by_type)
