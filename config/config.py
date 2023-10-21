@@ -52,4 +52,3 @@ category_mapping = {
     "Privacy & Security": ["Privacy"],
     "Others": ["SoFi"],
 }
-
