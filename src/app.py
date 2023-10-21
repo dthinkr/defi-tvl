@@ -20,6 +20,10 @@ def prepare_long_df(long_df):
 
 
 def create_stacked_area_chart(data, normalize=False):
+    # Define selections
+    selection = alt.selection_multi(fields=['type'], bind='legend')
+    interval = alt.selection_interval()
+
     y_encoding = alt.Y(
         "totalLiquidityUSD:Q",
         stack=True,
@@ -37,13 +41,14 @@ def create_stacked_area_chart(data, normalize=False):
         .encode(
             x="date:T",
             y=y_encoding,
-            color=alt.Color("type:N", title="Type"),
+            color=alt.Color("type:N", title="Type", legend=alt.Legend(title="Type")),
+            opacity=alt.condition(selection, alt.value(1), alt.value(0.2)),
             tooltip=["date", "type", "totalLiquidityUSD"],
         )
         .properties(title=title)
+        .add_selection(selection, interval)
     )
     return chart
-
 
 def create_chain_chart(category_df):
     chain_counts = category_df["chain"].value_counts()
