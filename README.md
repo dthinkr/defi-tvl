@@ -19,15 +19,16 @@ This project aims to analyze and process data related to Total Value Locked (TVL
     - $D$: `protocol_tvl`: This table aggregates a protocol's TVL.
 
 - **Table Relations**
-  - $\mathbf{z}$: A set of all protocols, where $\mathbf{z} = \{z_1, z_2, \dots, z_k\}$.
-  - $\mathbf{x}$: A set of all chains related to a protocol, where $\mathbf{x} = \{x_1, x_2, \dots, x_n\}$.
-  - $\mathbf{y}$: A set of all tokens associated with a protocol, where $\mathbf{y} = \{y_1, y_2, \dots, y_m\}$.
-  - $f_B: \mathbf{z} \times \mathbf{x} \times \mathbb{T} \rightarrow \mathbb{R}$: A function mapping a protocol, a chain, and a time $t$ to the TVL in table $B$.
-  - $f_C: \mathbf{z} \times \mathbf{y} \times \mathbb{T} \rightarrow \mathbb{R}$: A function mapping a protocol, a token, and a time $t$ to the TVL in table $C$.
-  - $f_D: \mathbf{z} \times \mathbb{T} \rightarrow \mathbb{R}$: A function mapping a protocol and a time $t$ to the total aggregated TVL in table $D$.
-  - At any given time $t$, the total TVL $f_D(z_i, t)$ for a protocol $z_i$ is given by:
-    - $f_D(z_i, t) = \sum_{j=1}^{n} f_B(z_i, x_j, t) = \sum_{k=1}^{m} f_C(z_i, y_k, t)$
-    - Where $n$ and $m$ represent the total number of chains and tokens respectively associated with the protocols.
+  - $\mathbf{z} = \{z_1, z_2, \dots, z_k\}$: The set of protocols.
+  - $\mathbf{x} = \{x_1, x_2, \dots, x_n\}$: The set of chains related to a protocol.
+  - $\mathbf{y} = \{y_1, y_2, \dots, y_m\}$: The set of tokens associated with a protocol.
+  - $\mathbb{T} = \{t_1, t_2, \dots\}$: The set of all time points.
+  - $f_B: \mathbf{z} \times \mathbf{x} \times \mathbb{T} \rightarrow \mathbb{R}$: Function mapping a protocol, chain, and time point to the TVL in table $B$.
+  - $f_C: \mathbf{z} \times \mathbf{y} \times \mathbb{T} \rightarrow \mathbb{R}$: Function mapping a protocol, token, and time point to the TVL in table $C$.
+  - $f_D: \mathbf{z} \times \mathbb{T} \rightarrow \mathbb{R}$: Function mapping a protocol and time point to the total aggregated TVL in table $D$.
+  - At any time point $t \in \mathbb{T}$, the total TVL $f_D(z_i, t)$ for a protocol $z_i$ can be succinctly expressed as:
+    - $f_D(z_i, t) = \sum f_B(z_i, x, t) = \sum f_C(z_i, y, t)$
+    - Where the summations are over all $x$ in $\mathbf{x}$ and all $y$ in $\mathbf{y}$.
 
 ## How to Use
 Access to Google BigQuery is necessary. 
