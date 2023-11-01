@@ -19,16 +19,15 @@ This project aims to analyze and process data related to Total Value Locked (TVL
     - $D$: `protocol_tvl`: This table aggregates a protocol's TVL.
 
 - **Table Relations**
-  - Each table is a set $A, B, C, D$.
-  - $\mathbf{z}$: A set of all protocols, where $\mathbf{z} = (z_1, z_2, \dots, z_k)$.
-  - $\mathbf{x}$: A set of all chains related to a protocol, where $\mathbf{x} = (x_1, x_2, \dots, x_n)$.
-  - $\mathbf{y}$: A set of all tokens associated with a protocol, where $\mathbf{y} = (y_1, y_2, \dots, y_m)$.
-  - $B_{z_i}(t)$: A function representing the TVL for the $i^{th}$ protocol in table $B$ separated by chain at time $t$.
-  - $C_{z_i}(t)$: A function representing the TVL for the $i^{th}$ protocol in table $C$ separated by token at time $t$.
-  - $D_{z_i}(t)$: A function representing the total aggregated TVL for the $i^{th}$ protocol at time $t$.
-  - At any given time $t$, the total TVL $D_{z_i}(t)$ for a protocol $z_i$ satisfies:
-    - $D_{z_i}(t) = \sum_{j=1}^{n} B_{z_i, x_j}(t) = \sum_{k=1}^{m} C_{z_i, y_k}(t)$
-    - Here, $n$ and $m$ represent the total number of chains and tokens associated with $z_i$.
+  - $\mathbf{z}$: A set of all protocols, where $\mathbf{z} = \{z_1, z_2, \dots, z_k\}$.
+  - $\mathbf{x}$: A set of all chains related to a protocol, where $\mathbf{x} = \{x_1, x_2, \dots, x_n\}$.
+  - $\mathbf{y}$: A set of all tokens associated with a protocol, where $\mathbf{y} = \{y_1, y_2, \dots, y_m\}$.
+  - $f_B: \mathbf{z} \times \mathbf{x} \times \mathbb{T} \rightarrow \mathbb{R}$: A function mapping a protocol, a chain, and a time $t$ to the TVL in table $B$.
+  - $f_C: \mathbf{z} \times \mathbf{y} \times \mathbb{T} \rightarrow \mathbb{R}$: A function mapping a protocol, a token, and a time $t$ to the TVL in table $C$.
+  - $f_D: \mathbf{z} \times \mathbb{T} \rightarrow \mathbb{R}$: A function mapping a protocol and a time $t$ to the total aggregated TVL in table $D$.
+  - At any given time $t$, the total TVL $f_D(z_i, t)$ for a protocol $z_i$ is given by:
+    - $f_D(z_i, t) = \sum_{j=1}^{n} f_B(z_i, x_j, t) = \sum_{k=1}^{m} f_C(z_i, y_k, t)$
+    - Where $n$ and $m$ represent the total number of chains and tokens respectively associated with the protocols.
 
 ## How to Use
 To use this project, you can clone the repository to your local machine or development environment. Ensure that you have the necessary credentials and access to Google BigQuery. You can then run the scripts provided to extract and analyze the TVL data as per your needs.
