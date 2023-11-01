@@ -20,6 +20,10 @@ This project aims to analyze and process data related to Total Value Locked (TVL
   - The relationship among tables B, C, and D is mathematically expressed as follows:
     - At any given time \(t\), the total TVL \(D(t)\) is represented as \(D(t) = \sum\_{i=1}^{n} B\_{\text{chain}\_i}(t) = \sum\_{j=1}^{m} C\_{\text{token}\_j}(t)\), where \(B\_{\text{chain}\_i}(t)\) and \(C\_{\text{token}\_j}(t)\) denote the TVL for the \(i^{th}\) chain in table \(B\) and the \(j^{th}\) token in table \(C\), respectively, and \(n\) and \(m\) are the total number of chains and tokens, respectively.
 
+
+This sentence shows math inline: $\sqrt{3x-1}+(1+x)^2$.
+
+
 ## How to Use
 
 ## Contributing
