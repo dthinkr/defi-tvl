@@ -30,10 +30,10 @@ This project aims to analyze and process data related to Total Value Locked (TVL
     - Where $n$ and $m$ represent the total number of chains and tokens respectively associated with the protocols.
 
 ## How to Use
-To use this project, you can clone the repository to your local machine or development environment. Ensure that you have the necessary credentials and access to Google BigQuery. You can then run the scripts provided to extract and analyze the TVL data as per your needs.
+Access to Google BigQuery is necessary. 
 
 ## Contributing
-Contributions to enhance this project are welcome. Feel free to open an issue or create a pull request.
+Feel free to open an issue or create a pull request.
 
 ## License
-Please refer to the `LICENSE` file in the repository for information regarding licensing.
+TBD. 
