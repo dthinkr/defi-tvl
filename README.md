@@ -19,9 +19,9 @@ This project aims to analyze and process data related to Total Value Locked (TVL
     - $D$: `protocol_tvl`: This table aggregates a protocol's TVL.
 
 - **Table Relations**
-  - $\mathbf{z} = \{z_1, z_2, \dots, z_k\}$: The set of protocols.
-  - $\mathbf{x} = \{x_1, x_2, \dots, x_n\}$: The set of chains related to a protocol.
-  - $\mathbf{y} = \{y_1, y_2, \dots, y_m\}$: The set of tokens associated with a protocol.
+  - $\mathbf{z} = \{z_1, z_2, \dots}$: The set of protocols.
+  - $\mathbf{x} = \{x_1, x_2, \dots}$: The set of chains related to a protocol.
+  - $\mathbf{y} = \{y_1, y_2, \dots}$: The set of tokens associated with a protocol.
   - $\mathbb{T} = \{t_1, t_2, \dots\}$: The set of all time points.
   - $f_B: \mathbf{z} \times \mathbf{x} \times \mathbb{T} \rightarrow \mathbb{R}$: Function mapping a protocol, chain, and time point to the TVL in table $B$.
   - $f_C: \mathbf{z} \times \mathbf{y} \times \mathbb{T} \rightarrow \mathbb{R}$: Function mapping a protocol, token, and time point to the TVL in table $C$.
