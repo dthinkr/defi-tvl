@@ -33,9 +33,9 @@ This project aims to analyze and process data related to Total Value Locked (TVL
 ![Database Schema](data/tvl/db/db_schema.png)
 
 ## How to Use
-Access to Google BigQuery is necessary. 
+Online access to Google BigQuery is necessary. 
 
-Link to visualization (TBD). 
+[Link to visualization app](https://defi-tvl.streamlit.app/)
 
 ## Contributing
 Feel free to open an issue or create a pull request.
