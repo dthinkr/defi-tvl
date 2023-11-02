@@ -11,18 +11,18 @@ This project aims to analyze and process data related to Total Value Locked (TVL
     - Data frequency for TVL and tokens is available in both daily and minute intervals.
     
 - **ETL for Granular Data**:
-  - The ETL (Extract, Transform, Load) process is established using Google Cloud Services and Google BigQuery.
-  - The data is organized into the following tables:
-    - $A$: `protocols`: This table contains metadata for each protocol.
-    - $B$: `protocol_chain_tvl`: This table details a protocol's TVL, separated by chain.
-    - $C$: `protocol_token_tvl`: This table details a protocol's TVL, separated by token.
-    - $D$: `protocol_tvl`: This table aggregates a protocol's TVL.
+  - An ETL (Extract, Transform, Load) process is established using Google Cloud Services and Google BigQuery.
+  - Data is organized into tables:
+    - $A$: `protocols`: Contains metadata for each protocol.
+    - $B$: `protocol_chain_tvl`: Details a protocol's TVL, separated by chain.
+    - $C$: `protocol_token_tvl`: Details a protocol's TVL, separated by token.
+    - $D$: `protocol_tvl`: Aggregates a protocol's TVL.
 
 - **Table Relations**
-  - $\mathbf{z} = \{z_1, z_2, \dots}$: The set of protocols.
-  - $\mathbf{x} = \{x_1, x_2, \dots}$: The set of chains related to a protocol.
-  - $\mathbf{y} = \{y_1, y_2, \dots}$: The set of tokens associated with a protocol.
-  - $\mathbb{T} = \{t_1, t_2, \dots\}$: The set of all time points.
+  - $\mathbf{z} = \{z_1, z_2, \dots\}$: Protocols.
+  - $\mathbf{x} = \{x_1, x_2, \dots\}$: Chains related to a protocol.
+  - $\mathbf{y} = \{y_1, y_2, \dots\}$: Tokens associated with a protocol.
+  - $\mathbb{T} = \{t_1, t_2, \dots\}$: All time points.
   - $f_B: \mathbf{z} \times \mathbf{x} \times \mathbb{T} \rightarrow \mathbb{R}$: Function mapping a protocol, chain, and time point to the TVL in table $B$.
   - $f_C: \mathbf{z} \times \mathbf{y} \times \mathbb{T} \rightarrow \mathbb{R}$: Function mapping a protocol, token, and time point to the TVL in table $C$.
   - $f_D: \mathbf{z} \times \mathbb{T} \rightarrow \mathbb{R}$: Function mapping a protocol and time point to the total aggregated TVL in table $D$.
@@ -34,6 +34,8 @@ This project aims to analyze and process data related to Total Value Locked (TVL
 
 ## How to Use
 Access to Google BigQuery is necessary. 
+
+Link to visualization (TBD). 
 
 ## Contributing
 Feel free to open an issue or create a pull request.

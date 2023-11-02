@@ -1,15 +1,15 @@
-import os
-
 from google.cloud import bigquery
+from google.oauth2 import service_account
+import streamlit as st
 
 from config.config import QUERY_DATA_SET, QUERY_PROJECT
 
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "key.json"
-
-
 class BigQueryClient:
     def __init__(self, project=QUERY_PROJECT, dataset=QUERY_DATA_SET):
-        self.client = bigquery.Client()
+        self.credentials = service_account.Credentials.from_service_account_info(
+            st.secrets["gcp_service_account"]
+            )
+        self.client = bigquery.Client(credentials=self.credentials)
         self.dataset_ref = self.client.dataset(dataset, project=project)
 
     def get_table(self, table_name):
