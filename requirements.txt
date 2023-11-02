@@ -9,4 +9,5 @@ Requests
 simplejson==3.19.2
 streamlit==1.27.2
 streamlit_pandas_profiling==0.1.3
+google-cloud-bigquery
 tqdm
