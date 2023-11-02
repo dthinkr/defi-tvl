@@ -3,7 +3,7 @@
 ## Overview
 This project aims to analyze and process data related to Total Value Locked (TVL) in various blockchain protocols. The primary data sources are CoinMetrics and DefiLlama. The project has evolved from utilizing extracted CSV files to directly querying data from Google BigQuery for a more efficient and streamlined analysis.
 
-## Outcomes
+## Introduction
 - **Data Sources**:
   - **CoinMetrics**: The data from CoinMetrics was found to lack granularity, making it less suitable for detailed analysis.
   - **DefiLlama**: DefiLlama data proved to be a valuable resource:
