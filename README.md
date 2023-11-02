@@ -30,6 +30,8 @@ This project aims to analyze and process data related to Total Value Locked (TVL
     - $f_D(z_i, t) = \sum f_B(z_i, x, t) = \sum f_C(z_i, y, t)$
     - Where the summations are over all $x$ in $\mathbf{x}$ and all $y$ in $\mathbf{y}$.
 
+![Database Schema](data/tvl/db/db_schema.png)
+
 ## How to Use
 Access to Google BigQuery is necessary. 
 
