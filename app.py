@@ -185,20 +185,16 @@ def main():
     st.write("### Chains")
     st.altair_chart(create_chain_chart(category_df), use_container_width=True)
 
-    # st.write("### Network Plot of Protocols and Tokens")
-    # percentage = st.slider(
-    #     "Percentage of Nodes Displayed", min_value=10, max_value=100, value=100
-    # )
+    st.write("### Network Plot of Protocols and Tokens")
+    percentage = st.slider(
+        "Percentage of Nodes Displayed", min_value=10, max_value=100, value=100
+    )
 
-    # node_names = nodes_df["name"].unique().tolist()
-    # node_names.sort()
+    node_names = nodes_df["name"].unique().tolist()
+    node_names.sort()
 
-    # selected_nodes = st.multiselect("Select node(s) to highlight", node_names)
-    # create_network_chart(nodes_df, edges_df, percentage, selected_nodes)
-
-    # st_profile_report(df_mini_sample.profile_report(minimal=True))
-    # report = df_mini_sample.profile_report()
-    # st.components.v1.html(report.to_html(), height=2000, scrolling=True)
+    selected_nodes = st.multiselect("Select node(s) to highlight", node_names)
+    create_network_chart(nodes_df, edges_df, percentage, selected_nodes)
 
     st.write("### Data Samples from BigQuery Tables")
 
