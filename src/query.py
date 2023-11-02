@@ -4,7 +4,7 @@ from google.cloud import bigquery
 
 from config.config import QUERY_DATA_SET, QUERY_PROJECT
 
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "private-key.json"
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "key.json"
 
 
 class BigQueryClient:
