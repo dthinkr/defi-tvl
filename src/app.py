@@ -7,17 +7,18 @@ import altair as alt
 
 import pandas as pd
 
-# import pandas_profiling
-# from streamlit_pandas_profiling import st_profile_report
+import pandas_profiling
+from streamlit_pandas_profiling import st_profile_report
 
 import streamlit as st
 import streamlit.components.v1 as components
 
-from config.config import CACHE_DIR
+from config.config import CACHE_DIR, QUERY_PROJECT, QUERY_DATA_SET
 
 import networkx as nx
 from pyvis.network import Network
 
+from src.query import BigQueryClient
 
 @st.cache_data
 def load_data():
@@ -27,7 +28,10 @@ def load_data():
     chain_dc_true = pd.read_csv(CACHE_DIR + "chain-dataset-All-doublecounted=true.csv")
     nodes_df = pd.read_csv(CACHE_DIR + "nodes_df.csv")
     edges_df = pd.read_csv(CACHE_DIR + "edges_df.csv")
-    return tvl_by_type, category_df, chain_dc_true, nodes_df, edges_df
+    bq = BigQueryClient(project=QUERY_PROJECT, dataset=QUERY_DATA_SET)
+    df_mini_sample = bq.get_sample_dataframe('mini', limit=3)
+    
+    return tvl_by_type, category_df, chain_dc_true, nodes_df, edges_df, df_mini_sample
 
 
 def prepare_tvl_by_type(tvl_by_type):
@@ -156,7 +160,7 @@ def main():
     """Execute the Streamlit app."""
     st.write("# DeFi TVL Test")
 
-    tvl_by_type, category_df, chain_dc_true, nodes_df, edges_df = load_data()
+    tvl_by_type, category_df, chain_dc_true, nodes_df, edges_df, df_mini_sample = load_data()
     tvl_by_type = prepare_tvl_by_type(tvl_by_type)
 
     st.write("### TVL")
@@ -175,24 +179,34 @@ def main():
     st.write("### Chains")
     st.altair_chart(create_chain_chart(category_df), use_container_width=True)
 
-    st.write("### Network Plot of Protocols and Tokens")
-    percentage = st.slider(
-        "Percentage of Nodes Displayed", min_value=10, max_value=100, value=100
-    )
+    # st.write("### Network Plot of Protocols and Tokens")
+    # percentage = st.slider(
+    #     "Percentage of Nodes Displayed", min_value=10, max_value=100, value=100
+    # )
 
-    node_names = nodes_df["name"].unique().tolist()
-    node_names.sort()
+    # node_names = nodes_df["name"].unique().tolist()
+    # node_names.sort()
 
-    selected_nodes = st.multiselect("Select node(s) to highlight", node_names)
-    create_network_chart(nodes_df, edges_df, percentage, selected_nodes)
+    # selected_nodes = st.multiselect("Select node(s) to highlight", node_names)
+    # create_network_chart(nodes_df, edges_df, percentage, selected_nodes)
 
-    # st_profile_report(category_df.profile_report())
+    # st_profile_report(df_mini_sample.profile_report(minimal=True))
+    # report = df_mini_sample.profile_report()
+    # st.components.v1.html(report.to_html(), height=2000, scrolling=True)
+
+
+    st.write("### Data Sample from BigQuery (Nested and Merged)")
+    st.write(df_mini_sample)
+
+    st.write("#### Profile Report")
+    report = df_mini_sample.profile_report(minimal=True)
+    st_profile_report(report)
+
 
     st.markdown(
         "<sup id='footnote1'>1</sup> Excluding double counting is possible on chain-level, but it is not possible on protocol-level.",
         unsafe_allow_html=True,
     )
-
 
 if __name__ == "__main__":
     main()
