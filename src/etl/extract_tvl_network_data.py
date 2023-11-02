@@ -1,8 +1,9 @@
-import pandas as pd
-import duckdb
 import random
+
 import altair as alt
+import duckdb
 import networkx as nx
+import pandas as pd
 
 # 1. Load the Parquet file
 con = duckdb.connect(database=":memory:")

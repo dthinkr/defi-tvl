@@ -1,24 +1,18 @@
-import sys
 import os
-
-sys.path.append(os.getcwd())
+import sys
 
 import altair as alt
-
+import networkx as nx
 import pandas as pd
-
 import pandas_profiling
-from streamlit_pandas_profiling import st_profile_report
-
 import streamlit as st
 import streamlit.components.v1 as components
-
-from config.config import CACHE_DIR, QUERY_PROJECT, QUERY_DATA_SET
-
-import networkx as nx
 from pyvis.network import Network
+from streamlit_pandas_profiling import st_profile_report
 
+from config.config import CACHE_DIR, TABLES
 from src.query import BigQueryClient
+
 
 @st.cache_data
 def load_data():
@@ -28,10 +22,14 @@ def load_data():
     chain_dc_true = pd.read_csv(CACHE_DIR + "chain-dataset-All-doublecounted=true.csv")
     nodes_df = pd.read_csv(CACHE_DIR + "nodes_df.csv")
     edges_df = pd.read_csv(CACHE_DIR + "edges_df.csv")
-    bq = BigQueryClient(project=QUERY_PROJECT, dataset=QUERY_DATA_SET)
-    df_mini_sample = bq.get_sample_dataframe('mini', limit=3)
-    
-    return tvl_by_type, category_df, chain_dc_true, nodes_df, edges_df, df_mini_sample
+    bq = BigQueryClient()
+
+    # Load sample data from BigQuery tables
+    sample_dfs = {}
+    for key, table_name in TABLES.items():
+        sample_dfs[key] = bq.get_sample_dataframe(table_name, limit=3)
+
+    return tvl_by_type, category_df, chain_dc_true, nodes_df, edges_df, sample_dfs
 
 
 def prepare_tvl_by_type(tvl_by_type):
@@ -71,7 +69,8 @@ def create_stacked_area_chart(data, normalize=False):
             tooltip=["date", "type", "totalLiquidityUSD"],
         )
         .properties(title=title)
-        .add_params(selection, interval)  # Updated from add_selection to add_params
+        # Updated from add_selection to add_params
+        .add_params(selection, interval)
     )
     return chart
 
@@ -160,7 +159,14 @@ def main():
     """Execute the Streamlit app."""
     st.write("# DeFi TVL Test")
 
-    tvl_by_type, category_df, chain_dc_true, nodes_df, edges_df, df_mini_sample = load_data()
+    (
+        tvl_by_type,
+        category_df,
+        chain_dc_true,
+        nodes_df,
+        edges_df,
+        sample_dfs,
+    ) = load_data()
     tvl_by_type = prepare_tvl_by_type(tvl_by_type)
 
     st.write("### TVL")
@@ -194,19 +200,22 @@ def main():
     # report = df_mini_sample.profile_report()
     # st.components.v1.html(report.to_html(), height=2000, scrolling=True)
 
+    st.write("### Data Samples from BigQuery Tables")
 
-    st.write("### Data Sample from BigQuery (Nested and Merged)")
-    st.write(df_mini_sample)
+    # Assuming 'sample_dfs' is available in the state
+    for key, sample_df in sample_dfs.items():
+        st.write(f"#### Data Sample from Table: {TABLES[key]}")
+        st.write(sample_df)
 
-    st.write("#### Profile Report")
-    report = df_mini_sample.profile_report(minimal=True)
-    st_profile_report(report)
-
+        st.write("##### Profile Report")
+        report = sample_df.profile_report(minimal=True)
+        st_profile_report(report)
 
     st.markdown(
         "<sup id='footnote1'>1</sup> Excluding double counting is possible on chain-level, but it is not possible on protocol-level.",
         unsafe_allow_html=True,
     )
+
 
 if __name__ == "__main__":
     main()

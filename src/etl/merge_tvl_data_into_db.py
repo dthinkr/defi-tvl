@@ -6,6 +6,8 @@ import duckdb
 import simplejson
 from tqdm import tqdm
 
+from config import CATEGORY_MAPPING, json_files_dir
+
 
 def initialize():
     # Append to system path
@@ -68,7 +70,7 @@ def post_process_data(conn):
     # Load category mapping
     category_to_group_mapping = {
         subcat: maincat
-        for maincat, sublist in category_mapping.items()
+        for maincat, sublist in CATEGORY_MAPPING.items()
         for subcat in sublist
     }
     conn.execute('ALTER TABLE crypto_merged ADD COLUMN "group" VARCHAR;')
@@ -79,7 +81,7 @@ def post_process_data(conn):
     conn.execute("PRAGMA memory_limit='32GB'")
     category_to_type_mapping = {
         subcat: maincat
-        for maincat, sublist in category_mapping.items()
+        for maincat, sublist in CATEGORY_MAPPING.items()
         for subcat in sublist
     }
     conn.execute('ALTER TABLE crypto_merged ADD COLUMN "type" VARCHAR;')
@@ -90,9 +92,6 @@ def post_process_data(conn):
     conn.execute(
         """UPDATE crypto_merged SET chainTvls = REPLACE(chainTvls, $$'$$, $$"$$);"""
     )
-
-
-from config import category_mapping, json_files_dir
 
 
 def clean_invalid_chars(json_str):

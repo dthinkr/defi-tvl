@@ -9,7 +9,14 @@ QUERY_PROJECT = "platinum-analog-402701"
 
 QUERY_DATA_SET = "tvl_all"
 
-category_mapping = {
+TABLES = {
+    "A": "A_protocols",
+    "B": "B_protocol_chain_tvl",
+    "C": "C_protocol_token_tvl",
+    "D": "D_protocol_tvl",
+}
+
+CATEGORY_MAPPING = {
     "Asset Management": [
         "Algo-Stables",
         "Decentralized Stablecoin",
