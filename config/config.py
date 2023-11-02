@@ -5,6 +5,10 @@
 
 CACHE_DIR = "data/tvl/cache/"
 
+QUERY_PROJECT = "platinum-analog-402701"
+
+QUERY_DATA_SET = "tvl_all"
+
 category_mapping = {
     "Asset Management": [
         "Algo-Stables",
