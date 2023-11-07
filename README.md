@@ -29,6 +29,8 @@ This project aims to analyze and process data related to Total Value Locked (TVL
   - At any time point $t \in \mathbb{T}$, the total TVL $f_D(z_i, t)$ for a protocol $z_i$ is given by:
     - $f_D(z_i, t) = \sum f_B(z_i, x, t) = \sum f_C(z_i, y, t)$
     - Where the summations are over all $x$ in $\mathbf{x}$ and all $y$ in $\mathbf{y}$.
+    - This equation assumes that the total TVL for a protocol at a given time point can be fully represented by either the sum of the TVLs across all chains or the sum of the TVLs across all tokens. It's important to note that this kind of aggregation assumes no overlap or double-counting between the chains and tokens; otherwise, the sums might not be equivalent.
+
 
 ![Database Schema](data/tvl/db/db_schema.png)
 
