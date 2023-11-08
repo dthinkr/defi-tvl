@@ -14,6 +14,7 @@ TABLES = {
     "B": "B_protocol_chain_tvl",
     "C": "C_protocol_token_tvl",
     "D": "D_protocol_tvl",
+    "E": "E_chain_ndc_tvl",
 }
 
 CATEGORY_MAPPING = {

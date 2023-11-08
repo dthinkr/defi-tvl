@@ -1,28 +1,39 @@
 from google.cloud import bigquery
+from google.cloud.bigquery.table import Table
+from google.cloud.bigquery.client import Client
+from google.cloud.bigquery.dataset import DatasetReference
 from google.oauth2 import service_account
+from google.oauth2.service_account import Credentials
+from typing import Optional
+import pandas as pd
 import streamlit as st
 
 from config.config import QUERY_DATA_SET, QUERY_PROJECT
 
 class BigQueryClient:
-    def __init__(self, project=QUERY_PROJECT, dataset=QUERY_DATA_SET):
-        self.credentials = service_account.Credentials.from_service_account_info(
+    def __init__(self, project: str = QUERY_PROJECT, dataset: str = QUERY_DATA_SET) -> None:
+        self.credentials: Credentials = service_account.Credentials.from_service_account_info(
             st.secrets["gcp_service_account"]
-            )
-        self.client = bigquery.Client(credentials=self.credentials)
-        self.dataset_ref = self.client.dataset(dataset, project=project)
+        )
+        self.client: Client = bigquery.Client(credentials=self.credentials, project=project)
+        self.dataset_ref: DatasetReference = self.client.dataset(dataset)
 
-    def get_table(self, table_name):
+    def get_table(self, table_name: str) -> Table:
         table_ref = self.dataset_ref.table(table_name)
-        return self.client.get_table(table_ref)
+        return self.client.get_table(table_ref)  # Returns a Table object
 
-    def get_table_schema(self, table_name):
+    def get_table_schema(self, table_name: str) -> list:
         """Fetch the table schema"""
         table = self.get_table(table_name)
-        return table.schema
+        return table.schema  # Returns a list of SchemaField objects
 
-    def get_sample_dataframe(self, table_name, limit=10):
-        query_string = (
-            f"SELECT * FROM `{self.dataset_ref.dataset_id}.{table_name}` LIMIT {limit}"
-        )
+    def get_dataframe(self, table_name: str, limit: Optional[int] = None) -> pd.DataFrame:
+        if limit is not None:
+            query_string = (
+                f"SELECT * FROM `{self.dataset_ref.dataset_id}.{table_name}` LIMIT {limit}"
+            )
+        else:
+            query_string = (
+                f"SELECT * FROM `{self.dataset_ref.dataset_id}.{table_name}`"
+            )
         return self.client.query(query_string).to_dataframe()
