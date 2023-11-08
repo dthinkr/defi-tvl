@@ -27,7 +27,7 @@ def load_data():
     # Load sample data from BigQuery tables
     sample_dfs = {}
     for key, table_name in TABLES.items():
-        sample_dfs[key] = bq.get_sample_dataframe(table_name, limit=3)
+        sample_dfs[key] = bq.get_dataframe(table_name, limit=3)
 
     return tvl_by_type, category_df, chain_dc_true, nodes_df, edges_df, sample_dfs
 
