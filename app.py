@@ -10,7 +10,7 @@ import streamlit.components.v1 as components
 from pyvis.network import Network
 from streamlit_pandas_profiling import st_profile_report
 
-from config.config import CACHE_DIR, TABLES
+from config.config import CACHE_DIR, TABLES, TOP_N
 from src.query import BigQueryClient
 
 
@@ -27,9 +27,15 @@ def load_data():
     # Load sample data from BigQuery tables
     sample_dfs = {}
     for key, table_name in TABLES.items():
-        sample_dfs[key] = bq.get_dataframe(table_name, limit=3)
+        sample_dfs[key] = bq.get_dataframe(table_name, limit=1)
 
-    return tvl_by_type, category_df, chain_dc_true, nodes_df, edges_df, sample_dfs
+    chain_ndc_tvl = bq.get_dataframe(TABLES['E'])
+    chain_ndc_tvl['date'] = pd.to_datetime(chain_ndc_tvl['date'], unit='s')
+    top_chains = chain_ndc_tvl.groupby('chain')['tvl'].sum().nlargest(TOP_N).index
+    chain_ndc_tvl['chain'] = chain_ndc_tvl['chain'].where(chain_ndc_tvl['chain'].isin(top_chains), 'Others')
+    chain_ndc_tvl.set_index('date', inplace=True)
+    chain_ndc_tvl = chain_ndc_tvl.groupby('chain').resample('W').sum().reset_index()
+    return tvl_by_type, category_df, chain_dc_true, nodes_df, edges_df, sample_dfs, chain_ndc_tvl
 
 
 def prepare_tvl_by_type(tvl_by_type):
@@ -166,14 +172,40 @@ def main():
         nodes_df,
         edges_df,
         sample_dfs,
+        chain_ndc_tvl,
     ) = load_data()
     tvl_by_type = prepare_tvl_by_type(tvl_by_type)
 
     st.write("### TVL")
-    st.markdown(
-        "Source: API -> Processed Data, Double Counted<sup><a href='#footnote1'>1</a></sup>",
-        unsafe_allow_html=True,
+    st.write(f'#### TVL (Exclude Double Counting)')
+
+    # Normalized stacked area chart
+    normalized_chart = alt.Chart(chain_ndc_tvl).mark_area().encode(
+        x=alt.X('date:T', axis=alt.Axis(format='%Y', title='Year')),  # Format the x-axis to show years
+        y=alt.Y('tvl:Q', stack='normalize', axis=alt.Axis(format='.0%', title='Percentage of Total Value Locked (TVL)')),  # Format the y-axis for percentage
+        color='chain:N'
+    ).properties(
+        title='Normalized TVL by Chain Over Time'
     )
+
+    # Display the normalized chart in Streamlit
+    st.altair_chart(normalized_chart, use_container_width=True)
+
+    # Stacked area chart with y-axis in billions
+    chart = alt.Chart(chain_ndc_tvl).mark_area().encode(
+        x=alt.X('date:T', axis=alt.Axis(format='%Y', title='Year')),  # Format the x-axis to show years
+        y=alt.Y('tvl:Q', axis=alt.Axis(format='.3s', title='Total Value Locked (TVL)')),  # Format the y-axis in billions with '.3s' for significant digits
+        color='chain:N'
+    ).properties(
+        title='TVL by Chain Over Time'
+    )
+
+    # Display the chart with y-axis in billions in Streamlit
+    st.altair_chart(chart, use_container_width=True)
+
+
+
+    st.write('#### Double Counted TVL')
     st.altair_chart(
         create_stacked_area_chart(tvl_by_type, normalize=True), use_container_width=True
     )
@@ -196,16 +228,15 @@ def main():
     selected_nodes = st.multiselect("Select node(s) to highlight", node_names)
     create_network_chart(nodes_df, edges_df, percentage, selected_nodes)
 
-    st.write("### Data Samples from BigQuery Tables")
+    # st.write("### Data Samples from BigQuery Tables")
 
-    # Assuming 'sample_dfs' is available in the state
-    for key, sample_df in sample_dfs.items():
-        st.write(f"#### Data Sample from Table: {TABLES[key]}")
-        st.write(sample_df)
+    # for key, sample_df in sample_dfs.items():
+    #     st.write(f"#### Data Sample from Table: {TABLES[key]}")
+    #     st.write(sample_df)
 
-        st.write("##### Profile Report")
-        report = sample_df.profile_report(minimal=True)
-        st_profile_report(report)
+    #     st.write("##### Profile Report")
+    #     report = sample_df.profile_report(minimal=True)
+    #     st_profile_report(report)
 
     st.markdown(
         "<sup id='footnote1'>1</sup> Excluding double counting is possible on chain-level, but it is not possible on protocol-level.",
