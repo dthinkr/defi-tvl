@@ -1,6 +1,5 @@
 import os
 import sys
-
 import altair as alt
 import networkx as nx
 import pandas as pd
@@ -10,8 +9,8 @@ import streamlit.components.v1 as components
 from pyvis.network import Network
 from streamlit_pandas_profiling import st_profile_report
 
-from config.config import CACHE_DIR, TABLES, TOP_N
-from src.query import BigQueryClient
+from config import CACHE_DIR, TABLES, TOP_N
+from query import BigQueryClient
 
 
 @st.cache_data

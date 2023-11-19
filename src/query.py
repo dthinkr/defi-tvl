@@ -8,6 +8,9 @@ from typing import Optional
 import pandas as pd
 import streamlit as st
 
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config.config import QUERY_DATA_SET, QUERY_PROJECT
 
 class BigQueryClient:
@@ -37,3 +40,8 @@ class BigQueryClient:
                 f"SELECT * FROM `{self.dataset_ref.dataset_id}.{table_name}`"
             )
         return self.client.query(query_string).to_dataframe()
+
+if __name__ == '__main__':
+    bq_client = BigQueryClient()
+    df = bq_client.get_dataframe('C_protocol_token_tvl', limit=10)
+    print(df.head())

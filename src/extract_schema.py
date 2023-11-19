@@ -1,5 +1,7 @@
 import os
 from google.cloud import bigquery
+import sys
+sys.path.append('')
 from config.config import TABLES
 from src.query import BigQueryClient
 
@@ -13,7 +15,7 @@ def format_field(field):
     return f"{field.name} {field.field_type}"
 
 # Define the filename to store the schema
-filename = '../data/tvl/db/db_schema.txt'
+filename = 'data/tvl/db/db_schema.txt'
 
 # Open the file in write mode
 with open(filename, 'w') as file:
