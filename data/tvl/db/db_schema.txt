@@ -7,7 +7,7 @@ audit_note STRING
 audits FLOAT
 category STRING
 chain STRING
-chains STRING FK -< B_protocol_chain_tvl.chain_name
+chains STRING
 cmcId STRING
 currentChainTvls STRING
 deadUrl BOOLEAN
@@ -17,7 +17,7 @@ gecko_id STRING
 github STRING
 governanceID STRING
 hallmarks STRING
-id PK INTEGER
+id INTEGER
 language STRING
 listedAt FLOAT
 logo STRING
@@ -47,26 +47,33 @@ type STRING
 
 B_protocol_chain_tvl
 -
-id INTEGER FK >- A_protocols.id
-chain_name STRING FK -< C_protocol_token_tvl.chain_name
+id INTEGER
+chain_name STRING
 date INTEGER
-totalLiquidityUSD FLOAT FK >- D_protocol_tvl.totalLiquidityUSD
+totalLiquidityUSD FLOAT
 
 
 C_protocol_token_tvl
 -
-id INTEGER FK >- A_protocols.id
+id INTEGER
 chain_name STRING
 date FLOAT
 token_name STRING
 quantity FLOAT
-value_usd FLOAT FK >- D_protocol_tvl.totalLiquidityUSD
+value_usd FLOAT
 
 
 D_protocol_tvl
 -
-id INTEGER FK >- A_protocols.id
+id INTEGER
 date INTEGER
 totalLiquidityUSD FLOAT
+
+
+E_chain_ndc_tvl
+-
+date INTEGER
+tvl FLOAT
+chain STRING
 
 
