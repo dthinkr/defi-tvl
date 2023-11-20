@@ -1,7 +1,9 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-from query import BigQueryClient
+from config.query import BigQueryClient
+import pandas_profiling
+from streamlit_pandas_profiling import st_profile_report
 
 # Function to retrieve TVL data from table A and C for Aave and Uniswap
 def get_tvl_data() -> pd.DataFrame:
@@ -25,6 +27,11 @@ def plot_tvl_data(df: pd.DataFrame) -> None:
     plt.ylabel('TVL')
     plt.show()
 
+def generate_profile_report(sample_df):
+    """Generate a profile report for a given DataFrame."""
+    report = sample_df.profile_report(minimal=True)
+    st_profile_report(report)
+
 # Main execution function
 def main() -> None:
     # Retrieve TVL data for Aave and Uniswap
@@ -34,3 +41,5 @@ def main() -> None:
 
 if __name__ == '__main__':
     main()
+    
+    

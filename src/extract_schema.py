@@ -3,7 +3,7 @@ from google.cloud import bigquery
 import sys
 sys.path.append('')
 from config.config import TABLES
-from src.query import BigQueryClient
+from config.query import BigQueryClient
 
 
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "key.json"

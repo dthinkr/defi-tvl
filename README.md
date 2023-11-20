@@ -17,6 +17,7 @@ This project aims to analyze and process data related to Total Value Locked (TVL
     - $B$: `protocol_chain_tvl`: Details a protocol's TVL, separated by chain.
     - $C$: `protocol_token_tvl`: Details a protocol's TVL, separated by token.
     - $D$: `protocol_tvl`: Aggregates a protocol's TVL.
+    - $E$: `chain_ndc_tvl`: Non-double counted TVL by chain.
 
 - **Table Relations**
   - $\mathbf{z} = \{z_1, z_2, \dots\}$: Protocols.
@@ -26,11 +27,11 @@ This project aims to analyze and process data related to Total Value Locked (TVL
   - $f_B: \mathbf{z} \times \mathbf{x} \times \mathbb{T} \rightarrow \mathbb{R}$: Function mapping a protocol, chain, and time point to the TVL in table $B$.
   - $f_C: \mathbf{z} \times \mathbf{y} \times \mathbb{T} \rightarrow \mathbb{R}$: Function mapping a protocol, token, and time point to the TVL in table $C$.
   - $f_D: \mathbf{z} \times \mathbb{T} \rightarrow \mathbb{R}$: Function mapping a protocol and time point to the total aggregated TVL in table $D$.
+  - $f_E: \mathbf{x} \times \mathbb{T} \rightarrow \mathbb{R}$: Function mapping a chain and time point to the non-double counted TVL in table $E$.
   - At any time point $t \in \mathbb{T}$, the total TVL $f_D(z_i, t)$ for a protocol $z_i$ is given by:
     - $f_D(z_i, t) = \sum f_B(z_i, x, t) = \sum f_C(z_i, y, t)$
     - Where the summations are over all $x$ in $\mathbf{x}$ and all $y$ in $\mathbf{y}$.
     - This equation assumes that the total TVL for a protocol at a given time point can be fully represented by either the sum of the TVLs across all chains or the sum of the TVLs across all tokens. It's important to note that this kind of aggregation assumes no overlap or double-counting between the chains and tokens; otherwise, the sums might not be equivalent.
-
 
 ![Database Schema](data/tvl/db/db_schema.png)
 
@@ -43,4 +44,4 @@ Online access to Google BigQuery is necessary.
 Feel free to open an issue or create a pull request.
 
 ## License
-TBD. 
+TBD.
