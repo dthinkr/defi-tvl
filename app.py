@@ -66,7 +66,7 @@ def main():
 
         if token_distribution_df is not None and not token_distribution_df.empty:
             # Display the DataFrame and the time series plot for the token
-            st.write(f"#### Distribution DataFrame with {len(token_distribution_df)} rows")
+            st.write(f"#### Retrieved data has {len(token_distribution_df)} rows")
             st.dataframe(token_distribution_df.head())
             st.write(f"#### Where is {token_name} locked? By protocol")
             ts_chart = plot_time_series(token_distribution_df, 'aggregated_date:T', 'total_value_usd:Q', 'protocol_name:N')
@@ -87,7 +87,6 @@ def main():
                 merged_agg = merged_df.groupby([aggregation_attribute, 'aggregated_date']).sum().reset_index()
 
                 st.write(f"#### Where is {token_name} locked? By {aggregation_attribute}")
-                st.dataframe(merged_agg.head())
                 ts_chart_a = plot_time_series(merged_agg, 'aggregated_date:T', 'total_value_usd:Q', f'{aggregation_attribute}:N')
                 st.altair_chart(ts_chart_a, use_container_width=True)
         else:
