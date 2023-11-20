@@ -1,0 +1,20 @@
+Table A (A_protocols):
+  address assetToken                                                                                                 audit_links audit_note  audits        category   chain    chains cmcId        currentChainTvls  deadUrl                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            description forkedFrom gecko_id       github governanceID hallmarks    id language      listedAt                                logo  mcap methodology metrics  misrepresentedTokens      module     name  openSource oracles oraclesByChain otherProtocols parentProtocol raises referralUrl  rugged stablecoins symbol treasury       twitter                  url  wrongLiquidity             group              type
+0    None       ESOL  [https://github.com/everstake/solana-program-library/blob/master/stake-pool/docs/EverSOL%20SP%20Audit.pdf]       None     2.0  Liquid Staking  Solana  [Solana]  None  {'Solana': 3941.78036}     <NA>  Eversol is a Solana Stake Pool that promotes network decentralization. Eversol's main concept is to dedicate a percentage of the pool rewards to the Stake Pool's Treasury, to fund the co-marketing activities with prospective projects built on Solana. Unlike other stake pools, we will directly facilitate and boost the DeFi ecosystem by helping new apps and products come to be known! We will help with co-marketing activities, useful business contacts, technical expertise, and consider the project as a recipient of funding from Everstake Capital.         []     None  [everstake]         None      None  2048     None  1.662040e+09  https://icons.llama.fi/eversol.jpg   NaN        None      {}                  <NA>  eversol.js  Eversol        <NA>      []           None           None           None     []        None    <NA>        None      -     None  eversol_pool  https://eversol.one            <NA>  Asset Management  Asset Management
+
+Table B (B_protocol_chain_tvl):
+     id chain_name        date  totalLiquidityUSD
+0  1591  Milkomeda  1648598400       2.188240e+07
+
+Table C (C_protocol_token_tvl):
+    id chain_name          date       token_name  quantity  value_usd
+0  512      pool2  1.642464e+09  GEIST-WFTM-SPLP       0.0        0.0
+
+Table D (D_protocol_tvl):
+     id        date  totalLiquidityUSD
+0  1148  1640736000        54036.56562
+
+Table E (E_chain_ndc_tvl):
+         date           tvl      chain
+0  1648598400  6.907395e+07  Milkomeda
+
