@@ -6,16 +6,17 @@ import numpy as np
 from config.config import TABLES
 from config.query import BigQueryClient
 
-def load_token_distribution(bq: BigQueryClient, token_name: str, row_percentage: float, granularity: str):
+@st.cache_data
+def load_token_distribution(_bq: BigQueryClient, token_name: str, row_percentage: float, granularity: str):
     """Load token distribution data from BigQuery with a percentage and granularity."""
     
-    token_distribution_df = bq.get_token_distribution(token_name, row_percentage, granularity)
+    token_distribution_df = _bq.get_token_distribution(token_name, row_percentage, granularity)
     
     # Get unique IDs from the token_distribution_df
     unique_ids = token_distribution_df['id'].unique()
 
     # Retrieve rows from table A based on unique IDs
-    table_a_df = bq.get_table_rows('A', unique_ids)
+    table_a_df = _bq.get_table_rows('A', unique_ids)
     
     return token_distribution_df, table_a_df
 
