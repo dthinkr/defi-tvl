@@ -15,6 +15,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config.config import QUERY_DATA_SET, QUERY_PROJECT
 
+
 class BigQueryClient:
     def __init__(self, project: str = QUERY_PROJECT, dataset: str = QUERY_DATA_SET) -> None:
         self.credentials: Credentials = service_account.Credentials.from_service_account_info(
@@ -52,18 +53,9 @@ class BigQueryClient:
         WHERE id IN ({', '.join(map(str, unique_ids))})
         """
         return self.client.query(query).to_dataframe()
-    
-    def get_token_distribution(self, token_name: str, row_percentage: float, granularity: str) -> pd.DataFrame:
-        """Retrieve the distribution of a specific token across protocols over time at specified granularity.
-
-        Args:
-            token_name (str): The name of the token to analyze.
-            row_percentage (float): The percentage of rows to return.
-            granularity (str): The data granularity ('daily', 'weekly', 'monthly').
-
-        Returns:
-            pd.DataFrame: A DataFrame containing the distribution data aggregated by the specified granularity.
-        """
+        
+    def get_token_distribution(self, token_name: str, granularity: str) -> pd.DataFrame:
+        """Retrieve the distribution of a specific token across protocols over time at specified granularity."""
         print("Preparing SQL query...")
 
         # Helper function to get the SQL expression for date truncation
@@ -77,24 +69,6 @@ class BigQueryClient:
 
         # Get the date truncation expression based on the granularity
         date_trunc_expr = get_date_trunc_expr(granularity)
-
-        # Construct the SQL query for total number of groups
-        count_query_string = f"""
-        SELECT 
-            COUNT(DISTINCT CONCAT(CAST({date_trunc_expr} AS STRING), '_', CAST(C.id AS STRING))) as total_groups
-        FROM 
-            `{self.dataset_ref.dataset_id}.{TABLES['C']}` C
-        WHERE 
-            C.token_name = '{token_name}' AND
-            C.quantity > 0 AND
-            C.value_usd > 0
-        """
-        # Execute count query and retrieve total number of groups
-        total_groups_df = self.client.query(count_query_string).to_dataframe()
-        total_groups = total_groups_df.iloc[0]['total_groups']
-
-        # Calculate the limit for the number of groups to return
-        group_limit = int((row_percentage / 100) * total_groups)
 
         # Construct the SQL query with aggregation
         query_string = f"""
@@ -121,12 +95,13 @@ class BigQueryClient:
         ORDER BY 
             aggregated_date,
             id
-        LIMIT
-            {group_limit}
         """
+        print(f"Executing data query: {query_string}")
 
         # Execute query and retrieve data
         df = self.client.query(query_string).to_dataframe()
+        latest_date = df['aggregated_date'].max()
+        print(f"Latest date in the fetched data: {latest_date}")
 
         return df
 

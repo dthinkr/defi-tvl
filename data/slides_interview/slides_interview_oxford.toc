@@ -1,4 +1,0 @@
-\babel@toc {english}{}\relax 
-\beamer@sectionintoc {1}{Self Introduction}{2}{0}{1}
-\beamer@sectionintoc {2}{Current work}{4}{0}{2}
-\beamer@sectionintoc {3}{Future}{8}{0}{3}
