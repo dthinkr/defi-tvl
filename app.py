@@ -7,10 +7,10 @@ from config.config import TABLES
 from config.query import BigQueryClient
 
 @st.cache_data
-def load_token_distribution(_bq: BigQueryClient, token_name: str, row_percentage: float, granularity: str):
+def load_token_distribution(_bq: BigQueryClient, token_name: str, granularity: str):
     """Load token distribution data from BigQuery with a percentage and granularity."""
     
-    token_distribution_df = _bq.get_token_distribution(token_name, row_percentage, granularity)
+    token_distribution_df = _bq.get_token_distribution(token_name, granularity)
     
     # Get unique IDs from the token_distribution_df
     unique_ids = token_distribution_df['id'].unique()
@@ -52,9 +52,6 @@ def main():
     
     bq = BigQueryClient()
 
-    # Slider for the user to select the percentage of rows to display
-    row_percentage = st.slider("Select the percentage of rows to display:", min_value=0, max_value=100, value=100, step=10)
-    
     # Selection for the user to define the data granularity
     granularity = st.selectbox("Select data granularity:", options=['daily', 'weekly', 'monthly'], index=1)  # default to 'weekly'
 
@@ -63,7 +60,7 @@ def main():
 
     if token_name:
         # Fetch data for the specified token name with the user-defined percentage and granularity
-        token_distribution_df, table_a_df = load_token_distribution(bq, token_name, row_percentage, granularity)
+        token_distribution_df, table_a_df = load_token_distribution(bq, token_name, granularity)
 
         if token_distribution_df is not None and not token_distribution_df.empty:
             # Display the DataFrame and the time series plot for the token
@@ -85,7 +82,7 @@ def main():
                 merged_df = pd.merge(token_distribution_df, table_a_df[['id', aggregation_attribute]], on='id')
 
                 # Group by the selected attribute and date, and then sum up the total value
-                merged_agg = merged_df.groupby([aggregation_attribute, 'aggregated_date']).sum().reset_index()
+                merged_agg = merged_df.groupby([aggregation_attribute, 'aggregated_date']).sum(numeric_only=True).reset_index()
 
                 st.write(f"#### Where is {token_name} locked? By {aggregation_attribute}")
                 ts_chart_a = plot_time_series(merged_agg, 'aggregated_date:T', 'total_value_usd:Q', f'{aggregation_attribute}:N')
