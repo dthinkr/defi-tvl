@@ -76,6 +76,8 @@ class BigQueryClient:
             {date_trunc_expr} as aggregated_date,
             C.id as id,
             A.name as protocol_name,
+            A.category as category,
+            A.type as type,
             C.chain_name,
             SUM(C.quantity) as total_quantity,
             SUM(C.value_usd) as total_value_usd
@@ -91,6 +93,8 @@ class BigQueryClient:
             aggregated_date,
             id,
             protocol_name,
+            category,
+            type,
             chain_name
         ORDER BY 
             aggregated_date,
@@ -104,7 +108,7 @@ class BigQueryClient:
         print(f"Latest date in the fetched data: {latest_date}")
 
         return df
-
+    
 if __name__ == '__main__':
     bq_client = BigQueryClient()
     df = bq_client.get_dataframe('C_protocol_token_tvl', limit=10)

@@ -3,7 +3,7 @@
 # json_files_dir = DATA_DIR + "tvl/"
 # protocol_headers_path = DATA_DIR + "headers/protocol_headers.json"
 
-TOP_N = 5
+TOP_N = 8
 
 CACHE_DIR = "data/tvl/cache/"
 
