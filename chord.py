@@ -1,73 +1,59 @@
-import streamlit as st
+import pandas as pd
 import numpy as np
-import json
+import holoviews as hv
+from holoviews import opts, dim
+import streamlit as st
+hv.extension('bokeh')
 
-# Generate synthetic data for the chord diagram
 def create_synthetic_data():
-    matrix = np.random.randint(1, 100, (5, 5)).tolist()
-    return matrix
+    # Synthetic Nodes Data
+    nodes = pd.DataFrame({
+        'index': range(5),  # Explicit numeric index
+        'name': ['Node1', 'Node2', 'Node3', 'Node4', 'Node5'],
+        'value': [10, 20, 30, 40, 50]
+    }).set_index('index')  # Setting the 'index' column as the DataFrame index
 
-data = create_synthetic_data()
+    # Synthetic Links Data
+    links = pd.DataFrame({
+        'source': np.random.choice(nodes.index, 10),  # Using numeric indices
+        'target': np.random.choice(nodes.index, 10),
+        'value': np.random.randint(1, 10, 10)
+    })
 
-# Convert the data to JSON format
-json_data = json.dumps(data)
+    return nodes, links
 
-# HTML and JavaScript for the D3.js chord diagram
-html_string = f"""
-<!DOCTYPE html>
-<html>
-<head>
-    <script src="https://d3js.org/d3.v5.min.js"></script>
-</head>
-<body>
-    <div id="chart"></div>
-    <script>
-        var matrix = {json_data};
+def display_chord_diagram():
+    nodes, links = create_synthetic_data()
 
-        var width = 450,
-            height = 450,
-            innerRadius = width / 2 - 120,
-            outerRadius = innerRadius + 10;
+    # Debugging: Check data types and values
+    print("Nodes DataFrame:pip install bokeh==2.4.0\n", nodes)
+    print("Links DataFrame:\n", links)
 
-        // Create the SVG container for the chord diagram and set its dimensions
-        var svg = d3.select("#chart").append("svg")
-            .attr("width", width)
-            .attr("height", height)
-            .append("g")
-            .attr("transform", "translate(" + width / 2 + "," + height / 2 + ")");
+    # Create HoloViews Dataset objects
+    hv_nodes = hv.Dataset(nodes, 'index')
+    hv_links = hv.Dataset(links, ['source', 'target'])
 
-        // Create the layout for the chord diagram
-        var chord = d3.chord()
-            .padAngle(0.05)
-            .sortSubgroups(d3.descending)(matrix);
+    # Create Chord object
+    chord = hv.Chord((hv_links, hv_nodes)).opts(
+        opts.Chord(
+            cmap='Category20', edge_cmap='Category20', 
+            labels='name', edge_color=dim('source').str()
+        )
+    )
 
-        // Create the groups (outer arcs)
-        var group = svg.append("g")
-            .selectAll("g")
-            .data(chord.groups)
-            .enter().append("g");
+    # Render and display the chord diagram in Streamlit
+    st.subheader('Synthetic Chord Diagram')
+    chord_diagram = hv.render(chord, backend='bokeh')
+    st.bokeh_chart(chord_diagram)
 
-        group.append("path")
-            .style("fill", "grey")
-            .style("stroke", "black")
-            .attr("d", d3.arc()
-                .innerRadius(innerRadius)
-                .outerRadius(outerRadius));
+# Main function of the Streamlit app
+def main():
+    st.title('Your App Title')
+    # ... your existing code ...
 
-        // Create the ribbons (inner chords)
-        svg.append("g")
-            .selectAll("path")
-            .data(chord)
-            .enter().append("path")
-            .attr("d", d3.ribbon()
-                .radius(innerRadius))
-            .style("fill", "blue")
-            .style("stroke", "black");
+    # Call to display the chord diagram
+    display_chord_diagram()
 
-    </script>
-</body>
-</html>
-"""
-
-# Use Streamlit's HTML component to render the chord diagram
-st.markdown(html_string, unsafe_allow_html=True)
+# Run the Streamlit app
+if __name__ == "__main__":
+    main()

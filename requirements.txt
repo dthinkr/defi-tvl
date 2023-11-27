@@ -12,3 +12,7 @@ streamlit_pandas_profiling==0.1.3
 google-cloud-bigquery
 db-dtypes
 tqdm
+
+panel==0.10.0
+holowviews==1.14.6
+bokeh==2.4.0
