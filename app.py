@@ -25,6 +25,7 @@ def load_token_distribution(_bq: BigQueryClient, token_name: str, granularity: s
     
     return token_distribution_df, table_a_df
 
+@st.cache_resource
 def plot_time_series(data, x_axis, y_axis, color_category):
 
     x_col = x_axis.split(':')[0]
