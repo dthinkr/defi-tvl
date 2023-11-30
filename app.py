@@ -32,30 +32,10 @@ def plot_time_series(data, x_axis, y_axis, color_category):
     y_col = y_axis.split(':')[0]
     color_col = color_category.split(':')[0]
 
-    # Debug: Inspect initial data
-    print("Initial data:", data.head())
-
-    # Debugging: Print out summary statistics for the y_col values by category
-    print(data.groupby(color_col)[y_col].describe())
-
     # Calculate the total and normalized values for stacking
     y_total_col = f"total_{y_col}"
     data[y_total_col] = data.groupby(x_col)[y_col].transform('sum')
     data['normalized_y'] = (data[y_col] / data[y_total_col]) * 100
-
-    # Debugging: Check for NaN values after normalization which can break the chart
-    if data['normalized_y'].isnull().any():
-        print("NaN values detected in 'normalized_y' after normalization.")
-        print(data[data['normalized_y'].isnull()])
-
-    # Debugging: Check for infinite values which can also break the chart
-    if np.isinf(data['normalized_y']).any():
-        print("Infinite values detected in 'normalized_y' after normalization.")
-        print(data[np.isinf(data['normalized_y'])])
-
-    # Debugging: Output the count of entries per category
-    print("Count of entries per category:")
-    print(data[color_col].value_counts())
 
     # Rank Categories
     category_totals = data.groupby(color_col)[y_col].sum().reset_index()
@@ -64,10 +44,6 @@ def plot_time_series(data, x_axis, y_axis, color_category):
 
     # Modify Categories
     data['adjusted_category'] = data.apply(lambda row: row[color_col] if row[color_col] in top_categories.values else 'Other', axis=1)
-
-    # Debug: Inspect data after adjusting categories
-    print("Data after adjusting categories:", data.head())
-
     # Original Line Chart
     line_chart = alt.Chart(data).mark_line().encode(
         x=alt.X(x_axis, axis=alt.Axis(format="%Y-%m")),
@@ -79,9 +55,6 @@ def plot_time_series(data, x_axis, y_axis, color_category):
     y_total_col = f"total_{y_col}"
     data[y_total_col] = data.groupby(x_col)[y_col].transform('sum')
     data['normalized_y'] = (data[y_col] / data[y_total_col]) * 100
-
-    # Debug: Inspect data before stacking in area chart
-    print("Data before stacking in area chart:", data.head())
 
     # Stacked Area Chart
     area_chart = alt.Chart(data).mark_area().encode(
@@ -97,7 +70,6 @@ def plot_time_series(data, x_axis, y_axis, color_category):
 
     return combined_charts
 
-
 def main():
     """Execute the Streamlit app."""
     st.title("DeFi TVL: Token Distribution Analysis")
@@ -105,7 +77,7 @@ def main():
     bq = BigQueryClient()
 
     # Selection for the user to define the data granularity
-    granularity = st.selectbox("Select data granularity:", options=['daily', 'weekly', 'monthly'], index=1)  # default to 'weekly'
+    granularity = st.selectbox("Select data granularity:", options=['daily', 'weekly', 'monthly'], index=2)  # default to 'weekly'
 
     # User input for selecting a token
     token_name = st.text_input("Enter the token name for analysis (e.g., DAI):", 'USDC')
@@ -123,10 +95,37 @@ def main():
         data_for_observable = token_distribution_df.to_dict(orient='records')
 
         # Pass this data to the Observable component
-        observable("My Observable Chart", 
+        observable("Tree", 
                 notebook="@venvox-ws/defi-tvl-data-loading", 
                 targets=["area"],
                 redefine={"data": data_for_observable,})
+        
+        extracted_df = token_distribution_df[['aggregated_date', 'protocol_name', 'type', 'total_value_usd']]
+        extracted_df.columns = ['date', 'name', 'category', 'value']
+        extracted_df['value'] = (extracted_df['value'] / 1000000).astype(int)
+
+        # Convert 'date' to datetime and filter out dates before 2021-01-01
+        extracted_df['date'] = pd.to_datetime(extracted_df['date'])
+        extracted_df = extracted_df[extracted_df['date'] >= '2021-01-01']
+
+        # Adjust all dates to the first day of their respective months
+        extracted_df['date'] = extracted_df['date'].apply(lambda x: x.replace(day=1))
+
+        # Group by the new date, name, and category, and sum up the values
+        # Adjust this step based on how you want to handle multiple entries
+        extracted_df = extracted_df.groupby(['date', 'name', 'category'], as_index=False).sum()
+
+        # Convert 'date' back to string
+        extracted_df['date'] = extracted_df['date'].dt.strftime('%Y-%m-%d')
+
+        # Convert the DataFrame to a dictionary
+        extracted_df = extracted_df.to_dict(orient='records')
+
+        # Pass this data to the Observable component
+        observable("Race", 
+                notebook="@venvox-ws/bar-chart-race", 
+                targets=["chart"],
+                redefine={"data2": extracted_df,})
         
         if token_distribution_df is not None and not token_distribution_df.empty:
             # Display the DataFrame and the time series plot for the token
@@ -157,9 +156,6 @@ def main():
                 
         else:
             st.write("No data available for the specified token.")
-
-    
-
 
 if __name__ == "__main__":
     main()
