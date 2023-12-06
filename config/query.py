@@ -109,6 +109,101 @@ class BigQueryClient:
 
         return df
     
+    def get_protocol_data(self, protocol_name: str, granularity: str) -> pd.DataFrame:
+        """Retrieve data for a specific protocol with granularity."""
+        # Helper function for date truncation expression
+        def get_date_trunc_expr(granularity):
+            if granularity == 'weekly':
+                return "DATE_TRUNC(DATE(TIMESTAMP_SECONDS(CAST(ROUND(C.date) AS INT64))), WEEK(MONDAY))"
+            elif granularity == 'monthly':
+                return "DATE_TRUNC(DATE(TIMESTAMP_SECONDS(CAST(ROUND(C.date) AS INT64))), MONTH)"
+            else:  # Default to daily granularity
+                return "DATE(DATE(TIMESTAMP_SECONDS(CAST(ROUND(C.date) AS INT64))))"
+
+        # Get the date truncation expression based on the granularity
+        date_trunc_expr = get_date_trunc_expr(granularity)
+
+        # Construct the SQL query
+        query_string = f"""
+        SELECT 
+            {date_trunc_expr} as aggregated_date,
+            C.id as id,
+            A.name as protocol_name,
+            A.category as category,
+            A.type as type,
+            C.chain_name,
+            C.token_name,  # Ensure 'token_name' column is included if needed
+            SUM(C.quantity) as total_quantity,
+            SUM(C.value_usd) as total_value_usd
+        FROM 
+            `{self.dataset_ref.dataset_id}.{TABLES['C']}` C
+        INNER JOIN 
+            `{self.dataset_ref.dataset_id}.{TABLES['A']}` A ON C.id = A.id
+        WHERE 
+            A.name = '{protocol_name}' AND
+            C.quantity > 0 AND
+            C.value_usd > 0
+        GROUP BY 
+            aggregated_date,
+            id,
+            protocol_name,
+            category,
+            type,
+            chain_name,
+            token_name  # Include 'token_name' in GROUP BY if it's selected
+        ORDER BY 
+            aggregated_date,
+            id
+        """
+        return self.client.query(query_string).to_dataframe()
+
+    def get_data_with_type(self, table_name: str, granularity: str) -> pd.DataFrame:
+            """Retrieve data from table C with the specified granularity and include 'type' from table A."""
+            
+            def get_date_trunc_expr(granularity):
+                if granularity == 'weekly':
+                    return "DATE_TRUNC(DATE(TIMESTAMP_SECONDS(CAST(ROUND(C.date) AS INT64))), WEEK(MONDAY))"
+                elif granularity == 'monthly':
+                    return "DATE_TRUNC(DATE(TIMESTAMP_SECONDS(CAST(ROUND(C.date) AS INT64))), MONTH)"
+                else:
+                    return "DATE(DATE(TIMESTAMP_SECONDS(CAST(ROUND(C.date) AS INT64))))"
+
+            date_trunc_expr = get_date_trunc_expr(granularity)
+
+            query_string = f"""
+            SELECT 
+                {date_trunc_expr} as aggregated_date,
+                C.id,
+                A.name as protocol_name,
+                A.category,
+                A.type,
+                C.chain_name,
+                C.token_name,
+                SUM(C.quantity) as total_quantity,
+                SUM(C.value_usd) as total_value_usd
+            FROM 
+                `{self.dataset_ref.dataset_id}.{TABLES[table_name]}` C
+            INNER JOIN 
+                `{self.dataset_ref.dataset_id}.{TABLES['A']}` A ON C.id = A.id
+            WHERE 
+                C.quantity > 0 AND
+                C.value_usd > 0
+            GROUP BY 
+                aggregated_date,
+                C.id,
+                protocol_name,
+                category,
+                type,
+                chain_name,
+                token_name
+            ORDER BY 
+                aggregated_date,
+                C.id
+            """
+
+            return self.client.query(query_string).to_dataframe()
+
+    
 if __name__ == '__main__':
     bq_client = BigQueryClient()
     df = bq_client.get_dataframe('C_protocol_token_tvl', limit=10)
