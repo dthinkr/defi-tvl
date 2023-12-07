@@ -48,8 +48,7 @@ def display_chord_diagram():
 
 # Main function of the Streamlit app
 def main():
-    st.title('Your App Title')
-    # ... your existing code ...
+    st.title('App Title')
 
     # Call to display the chord diagram
     display_chord_diagram()

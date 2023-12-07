@@ -66,3 +66,23 @@ CATEGORY_MAPPING = {
     "Privacy & Security": ["Privacy"],
     "Others": ["SoFi"],
 }
+
+
+original_names = [
+    "Trading & Exchanges",
+    "Lending, Borrowing & Real World Assets",
+    "Asset Management",
+    "Infrastructure, Services & Financial Products",
+    "Privacy & Security",
+    "Others"
+]
+
+# Creating abbreviations for the original names
+abbreviated_names = [
+    "Trade/Exch",                   # Abbreviation for "Trading & Exchanges"
+    "Lend/Borrow/RWA",              # Abbreviation for "Lending, Borrowing & Real World Assets"
+    "Asset Mgmt",                   # Abbreviation for "Asset Management"
+    "Infra/Serv/FinProd",           # Abbreviation for "Infrastructure, Services & Financial Products"
+    "Privacy/Sec",                  # Abbreviation for "Privacy & Security"
+    "Others"                        # Abbreviation remains the same for "Others"
+]

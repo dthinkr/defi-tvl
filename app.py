@@ -8,8 +8,9 @@ from streamlit_observable import observable
 import numpy as np
 import itertools as itertools
 
-from config.config import TOP_N
+from config.config import TOP_N, original_names, abbreviated_names
 from config.query import BigQueryClient
+from config.chord import ChordDiagramData
 
 @st.cache_data
 def load_token_distribution(_bq: BigQueryClient, token_name: str, granularity: str):
@@ -29,6 +30,19 @@ def load_token_distribution(_bq: BigQueryClient, token_name: str, granularity: s
 def load_protocol_data(_bq: BigQueryClient, protocol_name: str, granularity: str):
     """Load protocol data from BigQuery based on the protocol name and granularity."""
     return _bq.get_protocol_data(protocol_name, granularity)
+
+@st.cache_resource
+def get_chord_and_day_data(file_path):
+    # Create an instance of ChordDiagramData
+    chord_data = ChordDiagramData(file_path)
+
+    # Reverse the list of dates
+    unique_dates_reversed = list(reversed(chord_data.unique_dates))
+
+    # Get the data for the latest day
+    day_data = chord_data.get_data_for_day(unique_dates_reversed[0])
+
+    return chord_data, unique_dates_reversed, day_data
 
 @st.cache_resource
 def plot_time_series(data, x_axis, y_axis, color_category):
@@ -104,7 +118,7 @@ def main():
         # Convert DataFrame to JSON-serializable format (list of dictionaries)
         data_for_observable = token_distribution_df.to_dict(orient='records')
 
-        st.write('## Where is all the token stored?')
+        st.write(f'## Where is {token_name} locked?')
         st.write('### Tree map')
         # Pass this data to the Observable component
         observable("Tree", 
@@ -123,8 +137,6 @@ def main():
         # Adjust all dates to the first day of their respective months
         extracted_df['date'] = extracted_df['date'].apply(lambda x: x.replace(day=1))
 
-        # Group by the new date, name, and category, and sum up the values
-        # Adjust this step based on how you want to handle multiple entries
         extracted_df = extracted_df.groupby(['date', 'name', 'category'], as_index=False).sum()
 
         # Convert 'date' back to string
@@ -160,12 +172,10 @@ def main():
             # Group by the selected attribute and date, and then sum up the total value
             merged_agg = merged_df.groupby([aggregation_attribute, 'aggregated_date']).sum(numeric_only=True).reset_index()
 
-            st.write(f"#### Where is {token_name} locked? By {aggregation_attribute}")
+            st.write(f"#### Where is {token_name} locked? Aggregated by {aggregation_attribute}")
             ts_chart_a = plot_time_series(merged_agg, 'aggregated_date:T', 'total_value_usd:Q', f'{aggregation_attribute}:N')
             st.altair_chart(ts_chart_a, use_container_width=True)
 
-
-                
         else:
             st.write("No data available for the specified token.")
 
@@ -184,7 +194,26 @@ def main():
             st.altair_chart(ts_chart, use_container_width=True)
         else:
             st.write("No data available for the specified protocol.")
+    
+    st.write("# Landscape Analysis")
+    st.write('## Chord Diagram: Inter-Protocol Locked Values')
+    # Get cached data
+    chord_data, unique_dates_reversed, day_data = get_chord_and_day_data('data/tvl/db/tb.parquet')
+    
+    # Dropdown to select a specific date, defaulting to the first (latest) date
+    selected_date = st.selectbox("Select a date:", options=unique_dates_reversed, index=0)
 
+    # If selected date is not the latest, get data for the selected date
+    if selected_date != unique_dates_reversed[0]:
+        day_data = chord_data.get_data_for_day(selected_date)
+
+    day_data["names"] = abbreviated_names
+
+    # Pass this data to the Observable component
+    observable("Chord", 
+            notebook="@venvox-ws/chord-diagram", 
+            targets=["chart"],
+            redefine={"data": day_data})
 
 if __name__ == "__main__":
     main()
