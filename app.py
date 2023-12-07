@@ -31,7 +31,7 @@ def load_protocol_data(_bq: BigQueryClient, protocol_name: str, granularity: str
     """Load protocol data from BigQuery based on the protocol name and granularity."""
     return _bq.get_protocol_data(protocol_name, granularity)
 
-# @st.cache_data
+@st.cache_resource
 def get_chord_and_day_data(file_path):
     # Create an instance of ChordDiagramData
     chord_data = ChordDiagramData(file_path)
