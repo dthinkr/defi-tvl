@@ -9,12 +9,12 @@ class ChordDiagramData:
         self.data = pd.read_parquet(parquet_file_path)
         self.unique_dates = self.data['aggregated_date'].unique()
     
-    def get_color_for_type(self, type_name):
-        if type_name not in self.color_map:
-            # Generate a new color if not already present
-            color_palette = sns.color_palette("husl", 100)  # Using Seaborn's larger palette
-            self.color_map[type_name] = to_hex(color_palette[len(self.color_map) % 100])
-        return self.color_map[type_name]
+    # def get_color_for_type(self, type_name):
+    #     if type_name not in self.color_map:
+    #         # Generate a new color if not already present
+    #         color_palette = sns.color_palette("husl", 100)  # Using Seaborn's larger palette
+    #         self.color_map[type_name] = to_hex(color_palette[len(self.color_map) % 100])
+    #     return self.color_map[type_name]
 
     def get_data_for_day(self, day):
         # Filter the data for the given day
