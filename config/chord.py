@@ -57,7 +57,7 @@ class ChordDiagramData:
         matrix_values = normalized_matrix.values.tolist()
 
         # Generate a evenly distributed list of colors and convert them to hexadecimal format
-        colors = [self.get_color_for_type(type_name) for type_name in types]
+        colors = [to_hex(plt.cm.tab20(i/len(types))) for i in range(len(types))]
 
         # Preparing the final data structure for chord diagram
         chord_data = {
