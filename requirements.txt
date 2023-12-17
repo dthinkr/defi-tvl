@@ -20,3 +20,4 @@ stqdm
 
 streamlit-observable
 inequality
+pygini
