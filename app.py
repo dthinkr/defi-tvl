@@ -1,6 +1,5 @@
 import pandas as pd
 import streamlit as st
-import streamlit.components.v1 as components
 
 import altair as alt
 from streamlit_observable import observable
@@ -11,6 +10,9 @@ import itertools as itertools
 from config.config import TOP_N, original_names, abbreviated_names
 from config.query import BigQueryClient
 from config.chord import ChordDiagramData
+
+from config.plotting_governance import TokenDistributionVisualizer
+
 
 @st.cache_data
 def load_token_distribution(_bq: BigQueryClient, token_name: str, granularity: str):
@@ -93,6 +95,31 @@ def main():
     """Execute the Streamlit app."""
     st.title("DeFi TVL Demo")
     st.write("# Token Analysis")
+
+    # Plotting section
+    st.write("# Token Distribution Visualization")
+
+    # Create an instance of the visualization class
+    visualizer = TokenDistributionVisualizer('data/tvl/aave_agg.csv')
+
+    # Calculate Gini coefficients
+    visualizer.calculate_gini_coefficients()
+
+    # Display Gini Coefficient Plot
+    st.write("## Gini Coefficient Over Time")
+    visualizer.plot_gini_coefficients()
+    st.pyplot(plt)
+
+    # Display Staked Tokens Plot
+    st.write("## Staked Tokens Over Time")
+    visualizer.aggregate_top_addresses()
+    visualizer.plot_staked_tokens()
+    st.pyplot(plt)
+
+    # Display Yearly Distribution Plot
+    st.write("## Yearly Token Distribution")
+    visualizer.plot_yearly_distribution()
+    st.pyplot(plt)
     
     bq = BigQueryClient()
 
