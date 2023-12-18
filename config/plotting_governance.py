@@ -24,18 +24,18 @@ class TokenDistributionVisualizer:
         self.gini_coefficients = self.pivot_data.apply(calculate_gini, axis=1)
 
     def plot_gini_coefficients(self):
+        # Ensure the index is a DateTimeIndex using the correct string format for your dates
+        if not isinstance(self.gini_coefficients.index, pd.DatetimeIndex):
+            self.gini_coefficients.index = pd.to_datetime(self.gini_coefficients.index, format='%Y-%m-%d')  # adjust format if needed
+
+        # Now plot using the corrected index
         plt.figure(figsize=(12, 6), dpi=100)
         plt.plot(self.gini_coefficients.index, self.gini_coefficients.values, label='Gini Coefficient', color=self.palette[0])
-        plt.title('Gini Coefficient Over Time')
         plt.xlabel('Date')
         plt.ylabel('Gini Coefficient')
-        plt.gca().xaxis.set_major_locator(mdates.AutoDateLocator())
-        plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
-        plt.gcf().autofmt_xdate()
-        plt.xticks(rotation=45)
-        plt.grid(True)
+        plt.title('Gini Coefficient Over Time')
         plt.legend()
-        plt.tight_layout()
+        plt.grid(True)
         plt.show()
 
     def aggregate_top_addresses(self, top_n=5):
