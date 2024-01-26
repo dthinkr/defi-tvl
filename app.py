@@ -148,13 +148,13 @@ def main():
         # Convert DataFrame to JSON-serializable format (list of dictionaries)
         data_for_observable = token_distribution_df.to_dict(orient='records')
 
-        # st.write(f'## Where is {token_name} locked?')
-        # st.write('### Tree map')
-        # # Pass this data to the Observable component
-        # observable("Tree", 
-        #         notebook="@venvox-ws/defi-tvl-data-loading", 
-        #         targets=["area"],
-        #         redefine={"data": data_for_observable,})
+        st.write(f'## Where is {token_name} locked?')
+        st.write('### Tree map')
+        # Pass this data to the Observable component
+        observable("Tree", 
+                notebook="@venvox-ws/defi-tvl-data-loading", 
+                targets=["area"],
+                redefine={"data": data_for_observable,})
         
         extracted_df = token_distribution_df[['aggregated_date', 'protocol_name', 'type', 'total_value_usd']]
         extracted_df.columns = ['date', 'name', 'category', 'value']
@@ -175,13 +175,13 @@ def main():
         # Convert the DataFrame to a dictionary
         extracted_df = extracted_df.to_dict(orient='records')
 
-        # st.write('### Bar Chart Race')
+        st.write('### Bar Chart Race')
 
         # # Pass this data to the Observable component
-        # observable("Race", 
-        #         notebook="@venvox-ws/bar-chart-race", 
-        #         targets=["chart"],
-        #         redefine={"data2": extracted_df,})
+        observable("Race", 
+                notebook="@venvox-ws/bar-chart-race", 
+                targets=["chart"],
+                redefine={"data2": extracted_df,})
         
         st.write('### Time Series')
         
@@ -225,25 +225,25 @@ def main():
         else:
             st.write("No data available for the specified protocol.")
     
-    # st.write("# Landscape Analysis")
-    # st.write('## Chord Diagram: Inter-Protocol Locked Values')
-    # # Get cached data
-    # chord_data, unique_dates_reversed, day_data = get_chord_and_day_data('data/tvl/db/tb.parquet')
+    st.write("# Landscape Analysis")
+    st.write('## Chord Diagram: Inter-Protocol Locked Values')
+    # Get cached data
+    chord_data, unique_dates_reversed, day_data = get_chord_and_day_data('data/tvl/db/tb.parquet')
     
-    # # Dropdown to select a specific date, defaulting to the first (latest) date
-    # selected_date = st.selectbox("Select a date:", options=unique_dates_reversed, index=0)
+    # Dropdown to select a specific date, defaulting to the first (latest) date
+    selected_date = st.selectbox("Select a date:", options=unique_dates_reversed, index=0)
 
-    # # If selected date is not the latest, get data for the selected date
-    # if selected_date != unique_dates_reversed[0]:
-    #     day_data = chord_data.get_data_for_day(selected_date)
+    # If selected date is not the latest, get data for the selected date
+    if selected_date != unique_dates_reversed[0]:
+        day_data = chord_data.get_data_for_day(selected_date)
 
-    # day_data["names"] = abbreviated_names
+    day_data["names"] = abbreviated_names
 
-    # # Pass this data to the Observable component
-    # observable("Chord", 
-    #         notebook="@venvox-ws/chord-diagram", 
-    #         targets=["chart"],
-    #         redefine={"data": day_data})
+    # Pass this data to the Observable component
+    observable("Chord", 
+            notebook="@venvox-ws/chord-diagram", 
+            targets=["chart"],
+            redefine={"data": day_data})
 
 if __name__ == "__main__":
     main()
