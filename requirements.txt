@@ -21,3 +21,6 @@ stqdm
 streamlit-observable
 inequality
 pygini
+
+kaleido
+web3
