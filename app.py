@@ -97,31 +97,30 @@ def main():
     """Execute the Streamlit app."""
     st.title("DeFi TVL Demo")
 
-    # Plotting section
-    st.write("# Token Distribution Visualization")
+    # # Plotting section
+    # st.write("# Token Distribution Visualization")
 
-    # Create an instance of the visualization class
-    visualizer = TokenDistributionVisualizer('data/tvl/aave_agg.csv', 'tab10')
+    # # Create an instance of the visualization class
+    # visualizer = TokenDistributionVisualizer('data/tvl/aave_agg.csv', 'tab10')
 
-    # Calculate Gini coefficients
-    visualizer.calculate_gini_coefficients()
+    # # Calculate Gini coefficients
+    # visualizer.calculate_gini_coefficients()
 
-    # Display Gini Coefficient Plot
-    st.write("## Gini Coefficient Over Time")
-    visualizer.plot_gini_coefficients()
-    st.pyplot(plt)
+    # # Display Gini Coefficient Plot
+    # st.write("## Gini Coefficient Over Time")
+    # visualizer.plot_gini_coefficients()
+    # st.pyplot(plt)
 
-    # Display Staked Tokens Plot
-    st.write("## Staked Tokens Over Time")
-    visualizer.aggregate_top_addresses()
-    visualizer.plot_staked_tokens()
-    st.pyplot(plt)
+    # # Display Staked Tokens Plot
+    # st.write("## Staked Tokens Over Time")
+    # visualizer.aggregate_top_addresses()
+    # visualizer.plot_staked_tokens()
+    # st.pyplot(plt)
 
-    # Display Yearly Distribution Plot
-    st.write("## Yearly Token Distribution")
-    visualizer.plot_yearly_distribution()
-    st.pyplot(plt)
-    
+    # # Display Yearly Distribution Plot
+    # st.write("## Yearly Token Distribution")
+    # visualizer.plot_yearly_distribution()
+    # st.pyplot(plt)
 
     st.write("# Token Analysis")
 
@@ -129,9 +128,6 @@ def main():
 
     # Selection for the user to define the data granularity
     granularity = st.selectbox("Select data granularity:", options=['daily', 'weekly', 'monthly'], index=2)  # default to 'weekly'
-
-    # tb = bq.get_data_with_type('C', granularity)
-    # tb.to_csv('tb.csv', index=False)
 
     # User input for selecting a token
     token_name = st.text_input("Enter the token name for analysis (e.g., DAI):", 'USDC')
@@ -148,13 +144,13 @@ def main():
         # Convert DataFrame to JSON-serializable format (list of dictionaries)
         data_for_observable = token_distribution_df.to_dict(orient='records')
 
-        # st.write(f'## Where is {token_name} locked?')
-        # st.write('### Tree map')
-        # # Pass this data to the Observable component
-        # observable("Tree", 
-        #         notebook="@venvox-ws/defi-tvl-data-loading", 
-        #         targets=["area"],
-        #         redefine={"data": data_for_observable,})
+        st.write(f'## Where is {token_name} locked?')
+        st.write('### Tree map')
+        # Pass this data to the Observable component
+        observable("Tree", 
+                notebook="@venvox-ws/defi-tvl-data-loading", 
+                targets=["area"],
+                redefine={"data": data_for_observable,})
         
         extracted_df = token_distribution_df[['aggregated_date', 'protocol_name', 'type', 'total_value_usd']]
         extracted_df.columns = ['date', 'name', 'category', 'value']
@@ -177,11 +173,11 @@ def main():
 
         # st.write('### Bar Chart Race')
 
-        # # Pass this data to the Observable component
-        # observable("Race", 
-        #         notebook="@venvox-ws/bar-chart-race", 
-        #         targets=["chart"],
-        #         redefine={"data2": extracted_df,})
+        # Pass this data to the Observable component
+        observable("Race", 
+                notebook="@venvox-ws/bar-chart-race", 
+                targets=["chart"],
+                redefine={"data2": extracted_df,})
         
         st.write('### Time Series')
         
@@ -225,25 +221,25 @@ def main():
         else:
             st.write("No data available for the specified protocol.")
     
-    # st.write("# Landscape Analysis")
-    # st.write('## Chord Diagram: Inter-Protocol Locked Values')
-    # # Get cached data
-    # chord_data, unique_dates_reversed, day_data = get_chord_and_day_data('data/tvl/db/tb.parquet')
+    st.write("# Landscape Analysis")
+    st.write('## Chord Diagram: Inter-Protocol Locked Values')
+    # Get cached data
+    chord_data, unique_dates_reversed, day_data = get_chord_and_day_data('data/tvl/db/tb.parquet')
     
-    # # Dropdown to select a specific date, defaulting to the first (latest) date
-    # selected_date = st.selectbox("Select a date:", options=unique_dates_reversed, index=0)
+    # Dropdown to select a specific date, defaulting to the first (latest) date
+    selected_date = st.selectbox("Select a date:", options=unique_dates_reversed, index=0)
 
-    # # If selected date is not the latest, get data for the selected date
-    # if selected_date != unique_dates_reversed[0]:
-    #     day_data = chord_data.get_data_for_day(selected_date)
+    # If selected date is not the latest, get data for the selected date
+    if selected_date != unique_dates_reversed[0]:
+        day_data = chord_data.get_data_for_day(selected_date)
 
-    # day_data["names"] = abbreviated_names
+    day_data["names"] = abbreviated_names
 
-    # # Pass this data to the Observable component
-    # observable("Chord", 
-    #         notebook="@venvox-ws/chord-diagram", 
-    #         targets=["chart"],
-    #         redefine={"data": day_data})
+    # Pass this data to the Observable component
+    observable("Chord", 
+            notebook="@venvox-ws/chord-diagram", 
+            targets=["chart"],
+            redefine={"data": day_data})
 
 if __name__ == "__main__":
     main()
