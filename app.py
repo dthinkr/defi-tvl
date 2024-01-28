@@ -171,9 +171,13 @@ def main():
         # Convert the DataFrame to a dictionary
         extracted_df = extracted_df.to_dict(orient='records')
 
-        # st.write('### Bar Chart Race')
+        st.write('### Bar Chart Race')
 
+<<<<<<< HEAD
         # Pass this data to the Observable component
+=======
+        # # Pass this data to the Observable component
+>>>>>>> d7e736e6b8f0ed68d8cce8800c02974d03830247
         observable("Race", 
                 notebook="@venvox-ws/bar-chart-race", 
                 targets=["chart"],
