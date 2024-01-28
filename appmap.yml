@@ -1,5 +1,0 @@
-appmap_dir: tmp/appmap
-language: python
-name: defi-tvl
-packages:
-- path: defi-tvl
