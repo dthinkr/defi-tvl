@@ -1,2 +1,4 @@
 key.json
 .streamlit/secrets.toml
+*.csv
+*.ipynb
