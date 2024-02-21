@@ -202,6 +202,60 @@ class BigQueryClient:
             """
 
             return self.client.query(query_string).to_dataframe()
+    
+
+    def compare_months(self, year1: int, month1: int, year2: int, month2: int, table: str = TABLES['C']) -> pd.DataFrame:
+        """Compare monthly aggregated data between two months."""
+        query_string = f"""
+        WITH month1_data AS (
+            SELECT
+                id,
+                chain_name,
+                token_name,
+                DATE_TRUNC(DATE(TIMESTAMP_SECONDS(CAST(ROUND(date) AS INT64))), MONTH) AS year_month,
+                AVG(quantity) AS avg_quantity_month1,
+                AVG(value_usd) AS avg_value_usd_month1
+            FROM
+                `{self.dataset_ref.dataset_id}.{table}`
+            WHERE
+                EXTRACT(YEAR FROM TIMESTAMP_SECONDS(CAST(date AS INT64))) = {year1} AND
+                EXTRACT(MONTH FROM TIMESTAMP_SECONDS(CAST(date AS INT64))) = {month1}
+            GROUP BY
+                id, chain_name, token_name, year_month
+        ),
+        month2_data AS (
+            SELECT
+                id,
+                chain_name,
+                token_name,
+                DATE_TRUNC(DATE(TIMESTAMP_SECONDS(CAST(ROUND(date) AS INT64))), MONTH) AS year_month,
+                AVG(quantity) AS avg_quantity_month2,
+                AVG(value_usd) AS avg_value_usd_month2
+            FROM
+                `{self.dataset_ref.dataset_id}.{table}`
+            WHERE
+                EXTRACT(YEAR FROM TIMESTAMP_SECONDS(CAST(date AS INT64))) = {year2} AND
+                EXTRACT(MONTH FROM TIMESTAMP_SECONDS(CAST(date AS INT64))) = {month2}
+            GROUP BY
+                id, chain_name, token_name, year_month
+        )
+        SELECT
+            m1.id,
+            m1.chain_name,
+            m1.token_name,
+            m1.year_month AS year_month_month1,
+            m2.year_month AS year_month_month2,
+            m2.avg_quantity_month2 - m1.avg_quantity_month1 AS quantity_change,
+            m2.avg_value_usd_month2 - m1.avg_value_usd_month1 AS value_usd_change
+        FROM
+            month1_data m1
+        FULL OUTER JOIN
+            month2_data m2 ON m1.id = m2.id AND m1.chain_name = m2.chain_name AND m1.token_name = m2.token_name
+        WHERE
+            m2.avg_quantity_month2 - m1.avg_quantity_month1 != 0 OR
+            m2.avg_value_usd_month2 - m1.avg_value_usd_month1 != 0
+        """
+        return self.client.query(query_string).to_dataframe()
 
     
 if __name__ == '__main__':
