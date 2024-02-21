@@ -256,6 +256,28 @@ class BigQueryClient:
             m2.avg_value_usd_month2 - m1.avg_value_usd_month1 != 0
         """
         return self.client.query(query_string).to_dataframe()
+    
+    def query_by_month(self, year: int, month: int, table: str = TABLES['C']) -> pd.DataFrame:
+        """Query aggregated data by month."""
+        # Construct the SQL query
+        query_string = f"""
+        SELECT
+            id,
+            chain_name,
+            token_name,
+            DATE_TRUNC(DATE(TIMESTAMP_SECONDS(CAST(ROUND(date) AS INT64))), MONTH) AS year_month,
+            AVG(quantity) AS avg_quantity,
+            AVG(value_usd) AS avg_value_usd
+        FROM
+            `{self.dataset_ref.dataset_id}.{table}`
+        WHERE
+            EXTRACT(YEAR FROM TIMESTAMP_SECONDS(CAST(date AS INT64))) = {year} AND
+            EXTRACT(MONTH FROM TIMESTAMP_SECONDS(CAST(date AS INT64))) = {month}
+        GROUP BY
+            id, chain_name, token_name, year_month
+        """
+        # Execute the query and return the DataFrame
+        return self.client.query(query_string).to_dataframe()
 
     
 if __name__ == '__main__':
