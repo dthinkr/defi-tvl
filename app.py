@@ -142,8 +142,6 @@ def main():
 
         st.write("# Token Analysis")
 
-
-        # Selection for the user to define the data granularity
         granularity = st.selectbox("Select data granularity:", options=['daily', 'weekly', 'monthly'], index=2)  # default to 'weekly'
 
         # User input for selecting a token
@@ -171,12 +169,12 @@ def main():
             
             extracted_df = token_distribution_df[['aggregated_date', 'protocol_name', 'type', 'total_value_usd']]
             extracted_df.columns = ['date', 'name', 'category', 'value']
-            extracted_df['value'] = (extracted_df['value'] / 1000000).astype(int)
+            extracted_df.loc[:, 'value'] = (extracted_df['value'] / 1000000).astype(int)
 
             # Convert 'date' to datetime and filter out dates before 2021-01-01
-            extracted_df['date'] = pd.to_datetime(extracted_df['date'])
-            extracted_df = extracted_df[extracted_df['date'] >= '2021-01-01']
-
+            extracted_df.loc[:, 'date'] = pd.to_datetime(extracted_df['date'])
+            extracted_df = extracted_df[extracted_df['date'] >= pd.to_datetime('2021-01-01')]
+            
             # Adjust all dates to the first day of their respective months
             extracted_df['date'] = extracted_df['date'].apply(lambda x: x.replace(day=1))
 

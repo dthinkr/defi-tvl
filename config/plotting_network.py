@@ -55,7 +55,8 @@ class TokenCategorizer:
         self.categories['Other'].drop(columns=['mapped_or_filtered'], inplace=True)
         
     def map_rev_map(self):
-        self.categories['rev_map']['token_name'] = self.categories['rev_map']['token_name'].map(self.rev_map).copy()
+    # Use .loc to ensure modifications are done on the DataFrame directly
+        self.categories['rev_map'].loc[:, 'token_name'] = self.categories['rev_map']['token_name'].map(self.rev_map)
     
     def merge_categories(self):
         self.C_merged = pd.concat([self.categories['rev_map'], self.categories['UNKNOWN'], self.categories['Other']])
