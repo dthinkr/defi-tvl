@@ -244,7 +244,7 @@ def main():
 
     with tab2: 
         st.write("# Chord Diagram: Inter-Protocol Locked Values")
-        st.write("## Temp Removed, Improving Performance")
+        st.write("Removed to improve performance")
         # chord_data, unique_dates_reversed, day_data = get_chord_and_day_data('data/tvl/db/tb.parquet')
         
         # # Dropdown to select a specific date, defaulting to the first (latest) date
