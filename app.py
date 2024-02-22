@@ -163,11 +163,12 @@ def main():
 
             st.write(f'## Where is {token_name} locked?')
             st.write('### Tree map')
-            # Pass this data to the Observable component
-            observable("Tree", 
-                    notebook="@venvox-ws/defi-tvl-data-loading", 
-                    targets=["area"],
-                    redefine={"data": data_for_observable,})
+            st.write('Moved to design improvements')
+            # # Pass this data to the Observable component
+            # observable("Tree", 
+            #         notebook="@venvox-ws/defi-tvl-data-loading", 
+            #         targets=["area"],
+            #         redefine={"data": data_for_observable,})
             
             extracted_df = token_distribution_df[['aggregated_date', 'protocol_name', 'type', 'total_value_usd']]
             extracted_df.columns = ['date', 'name', 'category', 'value']
@@ -191,10 +192,11 @@ def main():
             st.write('### Bar Chart Race')
 
             # Pass this data to the Observable component
-            observable("Race", 
-                    notebook="@venvox-ws/bar-chart-race", 
-                    targets=["chart"],
-                    redefine={"data2": extracted_df,})
+            # observable("Race", 
+            #         notebook="@venvox-ws/bar-chart-race", 
+            #         targets=["chart"],
+            #         redefine={"data2": extracted_df,})
+            st.write('Moved to design improvements')
             
             st.write('### Time Series')
             
