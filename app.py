@@ -16,8 +16,6 @@ from config.query import BigQueryClient
 from config.chord import ChordDiagramData
 from config.plotting_network import TokenCategorizer
 
-
-
 @st.cache_data
 def load_token_distribution(_bq: BigQueryClient, token_name: str, granularity: str):
     """Load token distribution data from BigQuery with a percentage and granularity."""
@@ -298,8 +296,8 @@ def main():
         st.write("This shows the global monthly token locked changes across all DeFi protocols")
         st.markdown("""
         **Color Legend for Nodes:**
-        - ![#ffb71a](https://via.placeholder.com/15/ffb71a/000000?text=+) `Yellow`: Platform protocols (with complex lending and borrowing)
-        - ![#ff4b4b](https://via.placeholder.com/15/ff4b4b/000000?text=+) `Red`: Token-only protocols
+        - ![#ffb71a](https://via.placeholder.com/15/ffb71a/000000?text=+) `Yellow`: Secondary Market Protocols
+        - ![#ff4b4b](https://via.placeholder.com/15/ff4b4b/000000?text=+) `Red`: Primary Market Protocols
         """, unsafe_allow_html=True)
         year = st.selectbox("Select Year:", options=[2019, 2020, 2021, 2022, 2023], index=4)  # Example years, adjust as needed
         month = st.selectbox("Select Starting Month:", options=list(range(1, 13)), format_func=lambda x: f"{x:02d}", index=8)
