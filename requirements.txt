@@ -24,3 +24,5 @@ pygini
 
 kaleido
 web3
+
+pyvis
