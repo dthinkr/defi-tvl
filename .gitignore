@@ -5,3 +5,4 @@ key.json
 *.parquet
 *.tmp
 *.html
+*.pyc

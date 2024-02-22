@@ -2,7 +2,7 @@ altair==5.1.2
 duckdb==0.9.1
 networkx==3.1
 pandas==1.5.3
-pandas_profiling==3.5.0
+pandas_profiling==3.2.0
 protobuf==4.25.0
 pyvis==0.3.2
 Requests
