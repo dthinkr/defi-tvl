@@ -42,25 +42,26 @@ class TokenCategorizer:
     def process_other(self):
         def apply_manual_mapping_or_filter(token_name):
             if token_name in self.manual_mapping:
-                return self.manual_mapping[token_name]  
+                return self.manual_mapping[token_name]
             elif token_name in self.top_token_names:
-                return token_name 
+                return token_name
             else:
-                return None  
-        
-        self.categories['Other']['mapped_or_filtered'] = self.categories['Other']['token_name'].apply(apply_manual_mapping_or_filter)
-        self.categories['Other'] = self.categories['Other'].dropna(subset=['mapped_or_filtered'])
+                return None
+
+        # Create a temporary column directly in the DataFrame to avoid chained assignment
+        self.categories['Other'] = self.categories['Other'].assign(mapped_or_filtered=self.categories['Other']['token_name'].apply(apply_manual_mapping_or_filter))
+        self.categories['Other'].dropna(subset=['mapped_or_filtered'], inplace=True)
         self.categories['Other']['token_name'] = self.categories['Other']['mapped_or_filtered']
-        self.categories['Other'] = self.categories['Other'].drop(columns=['mapped_or_filtered'])
+        self.categories['Other'].drop(columns=['mapped_or_filtered'], inplace=True)
         
     def map_rev_map(self):
-        self.categories['rev_map']['token_name'] = self.categories['rev_map']['token_name'].map(self.rev_map)
-        
+        self.categories['rev_map']['token_name'] = self.categories['rev_map']['token_name'].map(self.rev_map).copy()
+    
     def merge_categories(self):
         self.C_merged = pd.concat([self.categories['rev_map'], self.categories['UNKNOWN'], self.categories['Other']])
 
     def process_result_sorted(self, result, A):
-        sort_column = 'value_usd_change' if 'value_usd_change' in result.columns else 'value_usd'
+        sort_column = 'usd_change' if 'usd_change' in result.columns else 'value_usd'
 
         result_sorted = result.sort_values(by=sort_column, ascending=False).head(3000)
 
@@ -98,28 +99,22 @@ class TokenCategorizer:
     
 
     def plot_network(self, result_sorted):
-        # Initialize Pyvis network
         net = Network(notebook=True, height="750px", width="100%", bgcolor="#FFFFFF", font_color="black", directed=True, cdn_resources="in_line")
 
-        # Track all unique nodes to avoid duplication
         unique_nodes = set()
 
-        # Add nodes and edges
         for index, row in result_sorted.iterrows():
             source_node = row['source_node']
             destination_node = row['destination_node']
             url = row['url']
             non_listed_protocols = row['non_listed_protocols']
-            value_usd_change = row['value_usd_change']  # Assuming this column exists in result_sorted
+            usd_change = row['usd_change']
             
-            # Determine node color based on non_listed_protocols
             node_color = "#ffb71a" if not non_listed_protocols else "#ff4b4b"
             
-            # Reverse the edge direction if value_usd_change is negative
-            if value_usd_change < 0:
+            if usd_change < 0:
                 source_node, destination_node = destination_node, source_node
             
-            # Add nodes if they haven't been added yet
             if source_node not in unique_nodes:
                 net.add_node(source_node, label=source_node, title=f"<a href='{url}' target='_blank'>{source_node}</a>", color=node_color)
                 unique_nodes.add(source_node)
@@ -127,9 +122,8 @@ class TokenCategorizer:
                 net.add_node(destination_node, label=destination_node, title=f"<a href='{url}' target='_blank'>{destination_node}</a>", color=node_color)
                 unique_nodes.add(destination_node)
             
-            # Add directed edge with value_usd as title for hover details
-            edge_width = abs(row['value_usd_change']) / max(abs(result_sorted['value_usd_change'])) * 10  # Scale for visibility
-            net.add_edge(source_node, destination_node, title=f"USD Change: ${row['value_usd_change']:.2f}", width=edge_width, arrows="to")
+            edge_width = abs(row['usd_change']) / max(abs(result_sorted['usd_change'])) * 10  # Scale for visibility
+            net.add_edge(source_node, destination_node, title=f"USD Change: ${row['usd_change']:.2f}", width=edge_width, arrows="to")
 
         net.set_options("""
         {

@@ -56,7 +56,6 @@ class BigQueryClient:
         
     def get_token_distribution(self, token_name: str, granularity: str) -> pd.DataFrame:
         """Retrieve the distribution of a specific token across protocols over time at specified granularity."""
-        print("Preparing SQL query...")
 
         # Helper function to get the SQL expression for date truncation
         def get_date_trunc_expr(granularity):
@@ -100,12 +99,10 @@ class BigQueryClient:
             aggregated_date,
             id
         """
-        print(f"Executing data query: {query_string}")
 
         # Execute query and retrieve data
         df = self.client.query(query_string).to_dataframe()
         latest_date = df['aggregated_date'].max()
-        print(f"Latest date in the fetched data: {latest_date}")
 
         return df
     
@@ -213,8 +210,8 @@ class BigQueryClient:
                 chain_name,
                 token_name,
                 DATE_TRUNC(DATE(TIMESTAMP_SECONDS(CAST(ROUND(date) AS INT64))), MONTH) AS year_month,
-                AVG(quantity) AS avg_quantity_month1,
-                AVG(value_usd) AS avg_value_usd_month1
+                AVG(quantity) AS qty_m1_avg,
+                AVG(value_usd) AS usd_m1_avg
             FROM
                 `{self.dataset_ref.dataset_id}.{table}`
             WHERE
@@ -229,8 +226,8 @@ class BigQueryClient:
                 chain_name,
                 token_name,
                 DATE_TRUNC(DATE(TIMESTAMP_SECONDS(CAST(ROUND(date) AS INT64))), MONTH) AS year_month,
-                AVG(quantity) AS avg_quantity_month2,
-                AVG(value_usd) AS avg_value_usd_month2
+                AVG(quantity) AS qty_m2_avg,
+                AVG(value_usd) AS usd_m2_avg
             FROM
                 `{self.dataset_ref.dataset_id}.{table}`
             WHERE
@@ -243,17 +240,21 @@ class BigQueryClient:
             m1.id,
             m1.chain_name,
             m1.token_name,
-            m1.year_month AS year_month_month1,
-            m2.year_month AS year_month_month2,
-            m2.avg_quantity_month2 - m1.avg_quantity_month1 AS quantity_change,
-            m2.avg_value_usd_month2 - m1.avg_value_usd_month1 AS value_usd_change
+            m1.year_month AS month1,
+            m2.year_month AS month2,
+            m1.qty_m1_avg,
+            m2.qty_m2_avg,
+            m1.usd_m1_avg,
+            m2.usd_m2_avg,
+            m2.qty_m2_avg - m1.qty_m1_avg AS qty_change,
+            m2.usd_m2_avg - m1.usd_m1_avg AS usd_change
         FROM
             month1_data m1
         FULL OUTER JOIN
             month2_data m2 ON m1.id = m2.id AND m1.chain_name = m2.chain_name AND m1.token_name = m2.token_name
         WHERE
-            m2.avg_quantity_month2 - m1.avg_quantity_month1 != 0 OR
-            m2.avg_value_usd_month2 - m1.avg_value_usd_month1 != 0
+            m2.qty_m2_avg - m1.qty_m1_avg != 0 OR
+            m2.usd_m2_avg - m1.usd_m1_avg != 0
         """
         return self.client.query(query_string).to_dataframe()
     
@@ -283,4 +284,3 @@ class BigQueryClient:
 if __name__ == '__main__':
     bq_client = BigQueryClient()
     df = bq_client.get_dataframe('C_protocol_token_tvl', limit=10)
-    print(df.head())
