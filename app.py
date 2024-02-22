@@ -293,7 +293,7 @@ def main():
 
     with tab3:
         st.write("# Network Diagram")
-        st.write("## This shows the global monthly token locked changes across all DeFi protocols")
+        st.write("This shows the global monthly token locked changes across all DeFi protocols")
         st.markdown("""
         **Color Legend for Nodes:**
         - ![#ffb71a](https://via.placeholder.com/15/ffb71a/000000?text=+) `Yellow`: Platform protocols (with complex lending and borrowing)
