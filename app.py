@@ -160,12 +160,12 @@ def main():
             data_for_observable = token_distribution_df.to_dict(orient='records')
 
             st.write(f'## Where is {token_name} locked?')
-            st.write('### Tree map')
-            # Pass this data to the Observable component
-            observable("Tree", 
-                    notebook="@venvox-ws/defi-tvl-data-loading", 
-                    targets=["area"],
-                    redefine={"data": data_for_observable,})
+            # st.write('### Tree map')
+            # # Pass this data to the Observable component
+            # observable("Tree", 
+            #         notebook="@venvox-ws/defi-tvl-data-loading", 
+            #         targets=["area"],
+            #         redefine={"data": data_for_observable,})
             
             extracted_df = token_distribution_df[['aggregated_date', 'protocol_name', 'type', 'total_value_usd']]
             extracted_df.columns = ['date', 'name', 'category', 'value']
@@ -186,13 +186,13 @@ def main():
             # Convert the DataFrame to a dictionary
             extracted_df = extracted_df.to_dict(orient='records')
 
-            st.write('### Bar Chart Race')
+            # st.write('### Bar Chart Race')
 
-            # Pass this data to the Observable component
-            observable("Race", 
-                    notebook="@venvox-ws/bar-chart-race", 
-                    targets=["chart"],
-                    redefine={"data2": extracted_df,})
+            # # Pass this data to the Observable component
+            # observable("Race", 
+            #         notebook="@venvox-ws/bar-chart-race", 
+            #         targets=["chart"],
+            #         redefine={"data2": extracted_df,})
             
             st.write('### Time Series')
             
@@ -240,7 +240,7 @@ def main():
 
     with tab2: 
         st.write("# Chord Diagram: Inter-Protocol Locked Values")
-        st.write("## Temp Removed, Improving Performance")
+        # st.write("## Temp Removed, Improving Performance")
         # chord_data, unique_dates_reversed, day_data = get_chord_and_day_data('data/tvl/db/tb.parquet')
         
         # # Dropdown to select a specific date, defaulting to the first (latest) date
@@ -294,8 +294,8 @@ def main():
         st.write("This shows the global monthly token locked changes across all DeFi protocols")
         st.markdown("""
         **Color Legend for Nodes:**
-        - ![#ffb71a](https://via.placeholder.com/15/ffb71a/000000?text=+) `Yellow`: Platform protocols (with complex lending and borrowing)
-        - ![#ff4b4b](https://via.placeholder.com/15/ff4b4b/000000?text=+) `Red`: Token-only protocols
+        - ![#ff4b4b](https://via.placeholder.com/15/ff4b4b/000000?text=+) `Red`: Primary Markets
+        - ![#ffb71a](https://via.placeholder.com/15/ffb71a/000000?text=+) `Yellow`: Secondary Markets
         """, unsafe_allow_html=True)
         year = st.selectbox("Select Year:", options=[2019, 2020, 2021, 2022, 2023], index=4)  # Example years, adjust as needed
         month = st.selectbox("Select Starting Month:", options=list(range(1, 13)), format_func=lambda x: f"{x:02d}", index=8)
@@ -312,6 +312,7 @@ def main():
         C = table_C_compare_months(bq, str(year), f"{month:02d}", str(end_year), f"{end_month:02d}")
         categorizer = TokenCategorizer(C)
         result = categorizer.process(A)
+        st.write(result.head(20))
         html_content = categorizer.plot_network(result)
         st.components.v1.html(html_content, height=600, scrolling=True)
         st.markdown(long_markdown, unsafe_allow_html=True)

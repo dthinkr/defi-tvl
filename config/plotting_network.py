@@ -23,10 +23,9 @@ class TokenCategorizer:
         self.categories['Other'] = self.df[~self.df['token_name'].str.contains('LP|UNKNOWN') & ~self.df['token_name'].isin(self.rev_map.keys())]
         
     def process_unknown(self, A):
-        # Check if the DataFrame is empty or if 'token_name' column is missing
         if self.categories['UNKNOWN'].empty or 'token_name' not in self.categories['UNKNOWN'].columns:
             print("DataFrame is empty or 'token_name' column is missing.")
-            return  # Exit the function if the condition is met
+            return
 
         unique_token_names = self.categories['UNKNOWN']['token_name'].unique()
         unique_addresses_list = list({match for name in unique_token_names 
@@ -48,14 +47,12 @@ class TokenCategorizer:
             else:
                 return None
 
-        # Create a temporary column directly in the DataFrame to avoid chained assignment
         self.categories['Other'] = self.categories['Other'].assign(mapped_or_filtered=self.categories['Other']['token_name'].apply(apply_manual_mapping_or_filter))
         self.categories['Other'].dropna(subset=['mapped_or_filtered'], inplace=True)
         self.categories['Other']['token_name'] = self.categories['Other']['mapped_or_filtered']
         self.categories['Other'].drop(columns=['mapped_or_filtered'], inplace=True)
         
     def map_rev_map(self):
-    # Use .loc to ensure modifications are done on the DataFrame directly
         self.categories['rev_map'].loc[:, 'token_name'] = self.categories['rev_map']['token_name'].map(self.rev_map)
     
     def merge_categories(self):
@@ -103,6 +100,7 @@ class TokenCategorizer:
         net = Network(notebook=True, height="750px", width="100%", bgcolor="#FFFFFF", font_color="black", directed=True, cdn_resources="in_line")
 
         unique_nodes = set()
+        min_size, max_size, max_usd_m1_avg = 5, 25, result_sorted['usd_m1_avg'].max()
 
         for index, row in result_sorted.iterrows():
             source_node = row['source_node']
@@ -115,12 +113,14 @@ class TokenCategorizer:
             
             if usd_change < 0:
                 source_node, destination_node = destination_node, source_node
-            
+
             if source_node not in unique_nodes:
-                net.add_node(source_node, label=source_node, title=f"<a href='{url}' target='_blank'>{source_node}</a>", color=node_color)
+                node_size = min_size + (row['usd_m1_avg'] / max_usd_m1_avg) * (max_size - min_size)  # Calculate node size
+                net.add_node(source_node, label=source_node, title=f"<a href='{url}' target='_blank'>{source_node}</a>, TVL: {row['usd_m1_avg']/1e9:.2f}B", color=node_color, size=node_size)
                 unique_nodes.add(source_node)
             if destination_node not in unique_nodes:
-                net.add_node(destination_node, label=destination_node, title=f"<a href='{url}' target='_blank'>{destination_node}</a>", color=node_color)
+                node_size = min_size + (row['usd_m1_avg'] / max_usd_m1_avg) * (max_size - min_size)  # Calculate node size for destination if different logic is needed
+                net.add_node(destination_node, label=destination_node, title=f"<a href='{url}' target='_blank'>{destination_node}</a>,, TVL: {row['usd_m1_avg']/1e9:.2f}B", color=node_color, size=node_size)
                 unique_nodes.add(destination_node)
             
             edge_width = abs(row['usd_change']) / max(abs(result_sorted['usd_change'])) * 10  # Scale for visibility
