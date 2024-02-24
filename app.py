@@ -16,8 +16,6 @@ from config.query import BigQueryClient
 from config.chord import ChordDiagramData
 from config.plotting_network import TokenCategorizer
 
-
-
 @st.cache_data
 def load_token_distribution(_bq: BigQueryClient, token_name: str, granularity: str):
     """Load token distribution data from BigQuery with a percentage and granularity."""
@@ -142,8 +140,6 @@ def main():
 
         st.write("# Token Analysis")
 
-
-        # Selection for the user to define the data granularity
         granularity = st.selectbox("Select data granularity:", options=['daily', 'weekly', 'monthly'], index=2)  # default to 'weekly'
 
         # User input for selecting a token
@@ -162,21 +158,22 @@ def main():
             data_for_observable = token_distribution_df.to_dict(orient='records')
 
             st.write(f'## Where is {token_name} locked?')
-            st.write('### Tree map')
-            # Pass this data to the Observable component
-            observable("Tree", 
-                    notebook="@venvox-ws/defi-tvl-data-loading", 
-                    targets=["area"],
-                    redefine={"data": data_for_observable,})
+            # st.write('### Tree map')
+            # st.write('Moved to design improvements')
+            # # Pass this data to the Observable component
+            # # observable("Tree", 
+            # #         notebook="@venvox-ws/defi-tvl-data-loading", 
+            # #         targets=["area"],
+            # #         redefine={"data": data_for_observable,})
             
             extracted_df = token_distribution_df[['aggregated_date', 'protocol_name', 'type', 'total_value_usd']]
             extracted_df.columns = ['date', 'name', 'category', 'value']
-            extracted_df['value'] = (extracted_df['value'] / 1000000).astype(int)
+            extracted_df.loc[:, 'value'] = (extracted_df['value'] / 1000000).astype(int)
 
             # Convert 'date' to datetime and filter out dates before 2021-01-01
-            extracted_df['date'] = pd.to_datetime(extracted_df['date'])
-            extracted_df = extracted_df[extracted_df['date'] >= '2021-01-01']
-
+            extracted_df.loc[:, 'date'] = pd.to_datetime(extracted_df['date'])
+            extracted_df = extracted_df[extracted_df['date'] >= pd.to_datetime('2021-01-01')]
+            
             # Adjust all dates to the first day of their respective months
             extracted_df['date'] = extracted_df['date'].apply(lambda x: x.replace(day=1))
 
@@ -188,13 +185,13 @@ def main():
             # Convert the DataFrame to a dictionary
             extracted_df = extracted_df.to_dict(orient='records')
 
-            st.write('### Bar Chart Race')
+            # st.write('### Bar Chart Race')
 
-            # Pass this data to the Observable component
-            observable("Race", 
-                    notebook="@venvox-ws/bar-chart-race", 
-                    targets=["chart"],
-                    redefine={"data2": extracted_df,})
+            # # Pass this data to the Observable component
+            # observable("Race", 
+            #         notebook="@venvox-ws/bar-chart-race", 
+            #         targets=["chart"],
+            #         redefine={"data2": extracted_df,})
             
             st.write('### Time Series')
             
@@ -293,7 +290,7 @@ def main():
 
     with tab3:
         st.write("# Network Diagram")
-        st.write("## This shows the global monthly token locked changes across all DeFi protocols")
+        st.write("This shows the global monthly token locked changes across all DeFi protocols")
         st.markdown("""
         **Color Legend for Nodes:**
         - ![#ffb71a](https://via.placeholder.com/15/ffb71a/000000?text=+) `Yellow`: Platform protocols (with complex lending and borrowing)
@@ -314,6 +311,7 @@ def main():
         C = table_C_compare_months(bq, str(year), f"{month:02d}", str(end_year), f"{end_month:02d}")
         categorizer = TokenCategorizer(C)
         result = categorizer.process(A)
+        st.write(result.head(20))
         html_content = categorizer.plot_network(result)
         st.components.v1.html(html_content, height=600, scrolling=True)
         st.markdown(long_markdown, unsafe_allow_html=True)
