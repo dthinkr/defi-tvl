@@ -97,36 +97,8 @@ class TokenCategorizer:
     
 
     def plot_network(self, result_sorted):
-        net = Network(notebook=True, height="750px", width="100%", bgcolor="#FFFFFF", font_color="black", directed=True, cdn_resources="in_line")
 
-        unique_nodes = set()
-        min_size, max_size, max_usd_m1_avg = 5, 25, result_sorted['usd_m1_avg'].max()
-
-        for index, row in result_sorted.iterrows():
-            source_node = row['source_node']
-            destination_node = row['destination_node']
-            url = row['url']
-            non_listed_protocols = row['non_listed_protocols']
-            usd_change = row['usd_change']
-            
-            node_color = "#ffb71a" if not non_listed_protocols else "#ff4b4b"
-            
-            if usd_change < 0:
-                source_node, destination_node = destination_node, source_node
-
-            if source_node not in unique_nodes:
-                node_size = min_size + (row['usd_m1_avg'] / max_usd_m1_avg) * (max_size - min_size)  # Calculate node size
-                net.add_node(source_node, label=source_node, title=f"<a href='{url}' target='_blank'>{source_node}</a>, TVL: {row['usd_m1_avg']/1e9:.2f}B", color=node_color, size=node_size)
-                unique_nodes.add(source_node)
-            if destination_node not in unique_nodes:
-                node_size = min_size + (row['usd_m1_avg'] / max_usd_m1_avg) * (max_size - min_size)  # Calculate node size for destination if different logic is needed
-                net.add_node(destination_node, label=destination_node, title=f"<a href='{url}' target='_blank'>{destination_node}</a>,, TVL: {row['usd_m1_avg']/1e9:.2f}B", color=node_color, size=node_size)
-                unique_nodes.add(destination_node)
-            
-            edge_width = abs(row['usd_change']) / max(abs(result_sorted['usd_change'])) * 10  # Scale for visibility
-            net.add_edge(source_node, destination_node, title=f"USD Change: ${row['usd_change']:.2f}", width=edge_width, arrows="to")
-
-        net.set_options("""
+        plot_settings = """
         {
         "nodes": {
             "font": {
@@ -159,6 +131,37 @@ class TokenCategorizer:
             }
         }
         }
-        """)
+        """
+
+        net = Network(notebook=True, height="750px", width="100%", bgcolor="#FFFFFF", font_color="black", directed=True, cdn_resources="in_line")
+
+        unique_nodes = set()
+        min_size, max_size, max_usd_m1_avg = 5, 25, result_sorted['usd_m1_avg'].max()
+
+        for index, row in result_sorted.iterrows():
+            source_node = row['source_node']
+            destination_node = row['destination_node']
+            url = row['url']
+            non_listed_protocols = row['non_listed_protocols']
+            usd_change = row['usd_change']
+            
+            node_color = "#ffb71a" if not non_listed_protocols else "#ff4b4b"
+            
+            if usd_change < 0:
+                source_node, destination_node = destination_node, source_node
+
+            if source_node not in unique_nodes:
+                node_size = min_size + (row['usd_m1_avg'] / max_usd_m1_avg) * (max_size - min_size)  # Calculate node size
+                net.add_node(source_node, label=source_node, title=f"<a href='{url}' target='_blank'>{source_node}</a>, TVL: {row['usd_m1_avg']/1e9:.2f}B", color=node_color, size=node_size)
+                unique_nodes.add(source_node)
+            if destination_node not in unique_nodes:
+                node_size = min_size + (row['usd_m1_avg'] / max_usd_m1_avg) * (max_size - min_size)  # Calculate node size for destination if different logic is needed
+                net.add_node(destination_node, label=destination_node, title=f"<a href='{url}' target='_blank'>{destination_node}</a>,, TVL: {row['usd_m1_avg']/1e9:.2f}B", color=node_color, size=node_size)
+                unique_nodes.add(destination_node)
+            
+            edge_width = abs(row['usd_change']) / max(abs(result_sorted['usd_change'])) * 10  # Scale for visibility
+            net.add_edge(source_node, destination_node, title=f"USD Change: ${row['usd_change']:.2f}", width=edge_width, arrows="to")
+
+        net.set_options(plot_settings)
         
         return net.generate_html()
