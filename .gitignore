@@ -6,3 +6,13 @@ key.json
 *.html
 *.png
 *.pyc
+.*
+__*
+*.code-workspace
+
+
+.DS_Store
+dist/
+docs/.observablehq/cache/
+node_modules/
+yarn-error.log
