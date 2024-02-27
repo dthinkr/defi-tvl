@@ -24,25 +24,48 @@ class BigQueryClient:
         self.client: Client = bigquery.Client(credentials=self.credentials, project=project)
         self.dataset_ref: DatasetReference = self.client.dataset(dataset)
 
-    def get_table(self, table_name: str) -> Table:
-        table_ref = self.dataset_ref.table(table_name)
-        return self.client.get_table(table_ref)  # Returns a Table object
+    def _execute_query(self, query: str) -> pd.DataFrame:
+        try:
+            return self.client.query(query).to_dataframe()
+        except exceptions.GoogleCloudError as e:
+            raise RuntimeError(f"Query execution failed: {e}")
+        
+    @staticmethod
+    def _get_date_trunc_expr(granularity: str) -> str:
+        if granularity == 'weekly':
+            return "DATE_TRUNC(DATE(TIMESTAMP_SECONDS(CAST(ROUND(C.date) AS INT64))), WEEK(MONDAY))"
+        elif granularity == 'monthly':
+            return "DATE_TRUNC(DATE(TIMESTAMP_SECONDS(CAST(ROUND(C.date) AS INT64))), MONTH)"
+        else:
+            return "DATE(DATE(TIMESTAMP_SECONDS(CAST(ROUND(C.date) AS INT64))))"
 
-    def get_table_schema(self, table_name: str) -> list:
+    def _get_table(self, table_name: str) -> Table:
+        table_ref = self.dataset_ref.table(table_name)
+        return self.client._get_table(table_ref) 
+
+    def _get_table_schema(self, table_name: str) -> list:
         """Fetch the table schema"""
-        table = self.get_table(table_name)
-        return table.schema  # Returns a list of SchemaField objects
+        table = self._get_table(table_name)
+        return table.schema
+    
+    def _get_last_modified_time(self, table_name: str) -> str:
+        """Get the last modified time of a table."""
+        table = self._get_table(table_name)
+        last_modified_time = table.modified
+        # Convert to a more readable format, if desired
+        formatted_time = last_modified_time.strftime('%Y-%m-%d %H:%M:%S %Z')
+        return formatted_time
 
     def get_dataframe(self, table_name: str, limit: Optional[int] = None) -> pd.DataFrame:
         if limit is not None:
-            query_string = (
+            query = (
                 f"SELECT * FROM `{self.dataset_ref.dataset_id}.{table_name}` LIMIT {limit}"
             )
         else:
-            query_string = (
+            query = (
                 f"SELECT * FROM `{self.dataset_ref.dataset_id}.{table_name}`"
             )
-        return self.client.query(query_string).to_dataframe()
+        return self._execute_query(query)
     
     def get_table_rows(self, table_name, unique_ids):
         table_name = TABLES[table_name]
@@ -52,24 +75,16 @@ class BigQueryClient:
         FROM `{self.dataset_ref.dataset_id}.{table_name}`
         WHERE id IN ({', '.join(map(str, unique_ids))})
         """
-        return self.client.query(query).to_dataframe()
+        return self._execute_query(query)
         
     def get_token_distribution(self, token_name: str, granularity: str) -> pd.DataFrame:
         """Retrieve the distribution of a specific token across protocols over time at specified granularity."""
 
-        def get_date_trunc_expr(granularity):
-            if granularity == 'weekly':
-                return "DATE_TRUNC(DATE(TIMESTAMP_SECONDS(CAST(ROUND(C.date) AS INT64))), WEEK(MONDAY))"
-            elif granularity == 'monthly':
-                return "DATE_TRUNC(DATE(TIMESTAMP_SECONDS(CAST(ROUND(C.date) AS INT64))), MONTH)"
-            else:  # Default to daily granularity
-                return "DATE(DATE(TIMESTAMP_SECONDS(CAST(ROUND(C.date) AS INT64))))"
-
         # Get the date truncation expression based on the granularity
-        date_trunc_expr = get_date_trunc_expr(granularity)
+        date_trunc_expr = self._get_date_trunc_expr(granularity)
 
         # Construct the SQL query with aggregation
-        query_string = f"""
+        query = f"""
         SELECT 
             {date_trunc_expr} as aggregated_date,
             C.id as id,
@@ -97,30 +112,16 @@ class BigQueryClient:
         ORDER BY 
             aggregated_date,
             id
-        """
-
-        # Execute query and retrieve data
-        df = self.client.query(query_string).to_dataframe()
-        latest_date = df['aggregated_date'].max()
-
-        return df
+        """        
+        return self._execute_query(query)
     
     def get_protocol_data(self, protocol_name: str, granularity: str) -> pd.DataFrame:
         """Retrieve data for a specific protocol with granularity."""
-        # Helper function for date truncation expression
-        def get_date_trunc_expr(granularity):
-            if granularity == 'weekly':
-                return "DATE_TRUNC(DATE(TIMESTAMP_SECONDS(CAST(ROUND(C.date) AS INT64))), WEEK(MONDAY))"
-            elif granularity == 'monthly':
-                return "DATE_TRUNC(DATE(TIMESTAMP_SECONDS(CAST(ROUND(C.date) AS INT64))), MONTH)"
-            else:  # Default to daily granularity
-                return "DATE(DATE(TIMESTAMP_SECONDS(CAST(ROUND(C.date) AS INT64))))"
 
-        # Get the date truncation expression based on the granularity
-        date_trunc_expr = get_date_trunc_expr(granularity)
+        date_trunc_expr = self.get_date_trunc_expr(granularity)
 
         # Construct the SQL query
-        query_string = f"""
+        query = f"""
         SELECT 
             {date_trunc_expr} as aggregated_date,
             C.id as id,
@@ -151,22 +152,14 @@ class BigQueryClient:
             aggregated_date,
             id
         """
-        return self.client.query(query_string).to_dataframe()
+        return self._execute_query(query)
 
     def get_data_with_type(self, table_name: str, granularity: str) -> pd.DataFrame:
             """Retrieve data from table C with the specified granularity and include 'type' from table A."""
-            
-            def get_date_trunc_expr(granularity):
-                if granularity == 'weekly':
-                    return "DATE_TRUNC(DATE(TIMESTAMP_SECONDS(CAST(ROUND(C.date) AS INT64))), WEEK(MONDAY))"
-                elif granularity == 'monthly':
-                    return "DATE_TRUNC(DATE(TIMESTAMP_SECONDS(CAST(ROUND(C.date) AS INT64))), MONTH)"
-                else:
-                    return "DATE(DATE(TIMESTAMP_SECONDS(CAST(ROUND(C.date) AS INT64))))"
 
-            date_trunc_expr = get_date_trunc_expr(granularity)
+            date_trunc_expr = self._get_date_trunc_expr(granularity)
 
-            query_string = f"""
+            query = f"""
             SELECT 
                 {date_trunc_expr} as aggregated_date,
                 C.id,
@@ -197,12 +190,11 @@ class BigQueryClient:
                 C.id
             """
 
-            return self.client.query(query_string).to_dataframe()
+            return self._execute_query(query)
     
-
     def compare_months(self, year1: int, month1: int, year2: int, month2: int, table: str = TABLES['C']) -> pd.DataFrame:
         """Compare monthly aggregated data between two months."""
-        query_string = f"""
+        query = f"""
         WITH month1_data AS (
             SELECT
                 id,
@@ -255,12 +247,12 @@ class BigQueryClient:
             m2.qty_m2_avg - m1.qty_m1_avg != 0 OR
             m2.usd_m2_avg - m1.usd_m1_avg != 0
         """
-        return self.client.query(query_string).to_dataframe()
+        return self._execute_query(query)
     
     def query_by_month(self, year: int, month: int, table: str = TABLES['C']) -> pd.DataFrame:
         """Query aggregated data by month."""
         # Construct the SQL query
-        query_string = f"""
+        query = f"""
         SELECT
             id,
             chain_name,
@@ -277,21 +269,13 @@ class BigQueryClient:
             id, chain_name, token_name, year_month
         """
         # Execute the query and return the DataFrame
-        return self.client.query(query_string).to_dataframe()
-
-    def get_last_modified_time(self, table_name: str) -> str:
-        """Get the last modified time of a table."""
-        table = self.get_table(table_name)
-        last_modified_time = table.modified
-        # Convert to a more readable format, if desired
-        formatted_time = last_modified_time.strftime('%Y-%m-%d %H:%M:%S %Z')
-        return formatted_time
+        return self._execute_query(query)
     
     def get_unique_token_names(self, table: str) -> pd.DataFrame:
         """Fetch unique token names from a specified table."""
         query = f"SELECT DISTINCT token_name FROM `{self.dataset_ref.dataset_id}.{table}`"
         try:
-            return self.client.query(query).to_dataframe()
+            return self._execute_query(query)
         except exceptions.BadRequest as e:
             if 'token_name' in str(e):
                 raise ValueError("The column 'token_name' does not exist in the specified table.") from e
