@@ -14,7 +14,9 @@ import itertools as itertools
 from config.config import TOP_N, original_names, abbreviated_names, TABLES
 from config.query import BigQueryClient
 from config.chord import ChordDiagramData
-from config.plotting_network import TokenCategorizer
+from config.plotting_network import NetworkVisualizer
+
+from datetime import datetime, timedelta
 
 @st.cache_data
 def load_token_distribution(_bq: BigQueryClient, token_name: str, granularity: str):
@@ -234,87 +236,100 @@ def main():
                 st.altair_chart(ts_chart, use_container_width=True)
             else:
                 st.write("No data available for the specified protocol.")
-        
 
-
-    with tab2: 
-        st.write("# Chord Diagram: Inter-Protocol Locked Values")
-        st.write("## Temp Removed, Improving Performance")
-        # chord_data, unique_dates_reversed, day_data = get_chord_and_day_data('data/tvl/db/tb.parquet')
-        
-        # # Dropdown to select a specific date, defaulting to the first (latest) date
-        # selected_date = st.selectbox("Select a date:", options=unique_dates_reversed, index=0)
-
-        # # If selected date is not the latest, get data for the selected date
-        # if selected_date != unique_dates_reversed[0]:
-        #     day_data = chord_data.get_data_for_day(selected_date)
-
-        # day_data["names"] = abbreviated_names
-        # observable("Chord", 
-        #         notebook="@venvox-ws/chord-diagram", 
-        #         targets=["chart"],
-        #         redefine={"data": day_data})
-    
-    long_markdown = """
-                    ### Preliminaries
-
-                    Let:
-
-                    - $\mathcal{A}$ represent the set of all protocols, where each protocol $a \in \mathcal{A}$ is identified by a unique identifier $id_a$, and may have associated attributes such as name and URL.
-                    - $\mathcal{C}$ denote the set of time-based data entries, where each entry $c \in \mathcal{C}$ corresponds to a token and includes information on the token's name, the change in its locked value over a specified time interval, and possibly its association with a protocol in $\mathcal{A}$.
-
-                    ### Categorization Function
-
-                    Define a categorization function $\phi: \mathcal{C} \\rightarrow \mathcal{K}$, which maps each token $c$ to a category $k \in \mathcal{K} = \{ rev\_map, LP, UNKNOWN, Other \}$ based on predefined rules related to the token's name and presence in reverse mappings or lists.
-
-                    ### Processing Functions
-
-                    1. **Unknown Tokens Processing** $\psi_{UNKNOWN}: \mathcal{C}_{UNKNOWN} \\rightarrow \mathcal{A}$: For tokens categorized as UNKNOWN, this function attempts to match token names to Ethereum addresses and subsequently to protocol identifiers in $\mathcal{A}$, effectively refining $\mathcal{C}_{UNKNOWN}$ to a more identifiable subset of $\mathcal{A}$.
-
-                    2. **Other Tokens Processing** $\psi_{Other}: \mathcal{C}_{Other} \\rightarrow \mathcal{A} \cup \{ null \}$: Applies manual mappings and filters to tokens in the Other category, potentially mapping them to protocols in $\mathcal{A}$ or excluding them (mapped to null).
-
-                    3. **Reverse Mapping Application** $\psi_{rev\_map}: \mathcal{C}_{rev\_map} \\rightarrow \mathcal{A}$: Directly maps tokens in the rev_map category to protocols in $\mathcal{A}$ using the provided reverse mapping.
-
-                    ### Merging and Sorting
-
-                    After processing, the subsets of $\mathcal{C}$ are merged into a single set $\mathcal{C}_{merged}$, which is then sorted based on the magnitude of value change, resulting in $\mathcal{C}_{sorted}$.
-
-                    ### Graph Construction
-
-                    Construct a directed graph $G = (V, E)$ where:
-
-                    - $V$ corresponds to protocols in $\mathcal{A}$, with each node $v$ representing a protocol.
-                    - $E$ consists of directed edges between nodes in $V$, with each edge $e(v_i, v_j)$ representing the flow of value from protocol $v_i$ to protocol $v_j$, derived from $\mathcal{C}_{sorted}$. The weight of each edge is proportional to the magnitude of the value change.
-
-                    """
-
-    with tab3:
-        st.write("# Network Diagram")
-        st.write("This shows the global monthly token locked changes across all DeFi protocols")
-        st.markdown("""
-        **Color Legend for Nodes:**
-        - ![#ffb71a](https://via.placeholder.com/15/ffb71a/000000?text=+) `Yellow`: Platform protocols (with complex lending and borrowing)
-        - ![#ff4b4b](https://via.placeholder.com/15/ff4b4b/000000?text=+) `Red`: Token-only protocols
-        """, unsafe_allow_html=True)
-        year = st.selectbox("Select Year:", options=[2019, 2020, 2021, 2022, 2023], index=4)  # Example years, adjust as needed
-        month = st.selectbox("Select Starting Month:", options=list(range(1, 13)), format_func=lambda x: f"{x:02d}", index=8)
-
-        # Calculate the ending month and year
-        if month == 12:
-            end_month = 1
-            end_year = year + 1
+        # Initialize or increment the date in session state
+        if 'selected_date' not in st.session_state:
+            # Initialize with today's date if not already in session state
+            st.session_state.selected_date = datetime.today()
         else:
-            end_month = month + 1
-            end_year = year
+            # Increment the date by one day
+            st.session_state.selected_date += timedelta(days=1)
 
-        A = retrieve_table_A(bq)
-        C = table_C_compare_months(bq, str(year), f"{month:02d}", str(end_year), f"{end_month:02d}")
-        categorizer = TokenCategorizer(C)
-        result = categorizer.process(A)
-        st.write(result.head(20))
-        html_content = categorizer.plot_network(result)
-        st.components.v1.html(html_content, height=600, scrolling=True)
-        st.markdown(long_markdown, unsafe_allow_html=True)
+        # Display the date and a button to increment
+        st.write("Current date:", st.session_state.selected_date)
+        if st.button('Increment date by one day'):
+            # This will trigger the increment in the session state above
+            pass
+
+
+    # with tab2: 
+    #     st.write("# Chord Diagram: Inter-Protocol Locked Values")
+    #     st.write("## Temp Removed, Improving Performance")
+    #     # chord_data, unique_dates_reversed, day_data = get_chord_and_day_data('data/tvl/db/tb.parquet')
+        
+    #     # # Dropdown to select a specific date, defaulting to the first (latest) date
+    #     # selected_date = st.selectbox("Select a date:", options=unique_dates_reversed, index=0)
+
+    #     # # If selected date is not the latest, get data for the selected date
+    #     # if selected_date != unique_dates_reversed[0]:
+    #     #     day_data = chord_data.get_data_for_day(selected_date)
+
+    #     # day_data["names"] = abbreviated_names
+    #     # observable("Chord", 
+    #     #         notebook="@venvox-ws/chord-diagram", 
+    #     #         targets=["chart"],
+    #     #         redefine={"data": day_data})
+    
+    # long_markdown = """
+    #                 ### Preliminaries
+
+    #                 Let:
+
+    #                 - $\mathcal{A}$ represent the set of all protocols, where each protocol $a \in \mathcal{A}$ is identified by a unique identifier $id_a$, and may have associated attributes such as name and URL.
+    #                 - $\mathcal{C}$ denote the set of time-based data entries, where each entry $c \in \mathcal{C}$ corresponds to a token and includes information on the token's name, the change in its locked value over a specified time interval, and possibly its association with a protocol in $\mathcal{A}$.
+
+    #                 ### Categorization Function
+
+    #                 Define a categorization function $\phi: \mathcal{C} \\rightarrow \mathcal{K}$, which maps each token $c$ to a category $k \in \mathcal{K} = \{ rev\_map, LP, UNKNOWN, Other \}$ based on predefined rules related to the token's name and presence in reverse mappings or lists.
+
+    #                 ### Processing Functions
+
+    #                 1. **Unknown Tokens Processing** $\psi_{UNKNOWN}: \mathcal{C}_{UNKNOWN} \\rightarrow \mathcal{A}$: For tokens categorized as UNKNOWN, this function attempts to match token names to Ethereum addresses and subsequently to protocol identifiers in $\mathcal{A}$, effectively refining $\mathcal{C}_{UNKNOWN}$ to a more identifiable subset of $\mathcal{A}$.
+
+    #                 2. **Other Tokens Processing** $\psi_{Other}: \mathcal{C}_{Other} \\rightarrow \mathcal{A} \cup \{ null \}$: Applies manual mappings and filters to tokens in the Other category, potentially mapping them to protocols in $\mathcal{A}$ or excluding them (mapped to null).
+
+    #                 3. **Reverse Mapping Application** $\psi_{rev\_map}: \mathcal{C}_{rev\_map} \\rightarrow \mathcal{A}$: Directly maps tokens in the rev_map category to protocols in $\mathcal{A}$ using the provided reverse mapping.
+
+    #                 ### Merging and Sorting
+
+    #                 After processing, the subsets of $\mathcal{C}$ are merged into a single set $\mathcal{C}_{merged}$, which is then sorted based on the magnitude of value change, resulting in $\mathcal{C}_{sorted}$.
+
+    #                 ### Graph Construction
+
+    #                 Construct a directed graph $G = (V, E)$ where:
+
+    #                 - $V$ corresponds to protocols in $\mathcal{A}$, with each node $v$ representing a protocol.
+    #                 - $E$ consists of directed edges between nodes in $V$, with each edge $e(v_i, v_j)$ representing the flow of value from protocol $v_i$ to protocol $v_j$, derived from $\mathcal{C}_{sorted}$. The weight of each edge is proportional to the magnitude of the value change.
+
+    #                 """
+
+    # with tab3:
+    #     st.write("# Network Diagram")
+    #     st.write("This shows the global monthly token locked changes across all DeFi protocols")
+    #     st.markdown("""
+    #     **Color Legend for Nodes:**
+    #     - ![#ffb71a](https://via.placeholder.com/15/ffb71a/000000?text=+) `Yellow`: Platform protocols (with complex lending and borrowing)
+    #     - ![#ff4b4b](https://via.placeholder.com/15/ff4b4b/000000?text=+) `Red`: Token-only protocols
+    #     """, unsafe_allow_html=True)
+    #     year = st.selectbox("Select Year:", options=[2019, 2020, 2021, 2022, 2023], index=4)  # Example years, adjust as needed
+    #     month = st.selectbox("Select Starting Month:", options=list(range(1, 13)), format_func=lambda x: f"{x:02d}", index=8)
+
+    #     # Calculate the ending month and year
+    #     if month == 12:
+    #         end_month = 1
+    #         end_year = year + 1
+    #     else:
+    #         end_month = month + 1
+    #         end_year = year
+
+    #     A = retrieve_table_A(bq)
+    #     C = table_C_compare_months(bq, str(year), f"{month:02d}", str(end_year), f"{end_month:02d}")
+    #     categorizer = NetworkVisualizer(C)
+    #     result = categorizer.process(A)
+    #     st.write(result.head(20))
+    #     html_content = categorizer.plot_network(result)
+    #     st.components.v1.html(html_content, height=600, scrolling=True)
+    #     st.markdown(long_markdown, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()

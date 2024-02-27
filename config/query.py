@@ -1,4 +1,4 @@
-from google.cloud import bigquery
+from google.cloud import bigquery, exceptions
 from google.cloud.bigquery.table import Table
 from google.cloud.bigquery.client import Client
 from google.cloud.bigquery.dataset import DatasetReference
@@ -57,7 +57,6 @@ class BigQueryClient:
     def get_token_distribution(self, token_name: str, granularity: str) -> pd.DataFrame:
         """Retrieve the distribution of a specific token across protocols over time at specified granularity."""
 
-        # Helper function to get the SQL expression for date truncation
         def get_date_trunc_expr(granularity):
             if granularity == 'weekly':
                 return "DATE_TRUNC(DATE(TIMESTAMP_SECONDS(CAST(ROUND(C.date) AS INT64))), WEEK(MONDAY))"
@@ -279,6 +278,25 @@ class BigQueryClient:
         """
         # Execute the query and return the DataFrame
         return self.client.query(query_string).to_dataframe()
+
+    def get_last_modified_time(self, table_name: str) -> str:
+        """Get the last modified time of a table."""
+        table = self.get_table(table_name)
+        last_modified_time = table.modified
+        # Convert to a more readable format, if desired
+        formatted_time = last_modified_time.strftime('%Y-%m-%d %H:%M:%S %Z')
+        return formatted_time
+    
+    def get_unique_token_names(self, table: str) -> pd.DataFrame:
+        """Fetch unique token names from a specified table."""
+        query = f"SELECT DISTINCT token_name FROM `{self.dataset_ref.dataset_id}.{table}`"
+        try:
+            return self.client.query(query).to_dataframe()
+        except exceptions.BadRequest as e:
+            if 'token_name' in str(e):
+                raise ValueError("The column 'token_name' does not exist in the specified table.") from e
+            else:
+                raise
 
     
 if __name__ == '__main__':
