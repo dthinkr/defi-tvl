@@ -30,14 +30,13 @@ class BigQueryClient:
         except exceptions.GoogleCloudError as e:
             raise RuntimeError(f"Query execution failed: {e}")
         
-    @staticmethod
-    def _get_date_trunc_expr(granularity: str) -> str:
-        if granularity == 'weekly':
-            return "DATE_TRUNC(DATE(TIMESTAMP_SECONDS(CAST(ROUND(C.date) AS INT64))), WEEK(MONDAY))"
-        elif granularity == 'monthly':
-            return "DATE_TRUNC(DATE(TIMESTAMP_SECONDS(CAST(ROUND(C.date) AS INT64))), MONTH)"
-        else:
-            return "DATE(DATE(TIMESTAMP_SECONDS(CAST(ROUND(C.date) AS INT64))))"
+    def _get_date_trunc_expr(self, granularity: str) -> str:
+        expressions = {
+            'weekly': "DATE_TRUNC(DATE(TIMESTAMP_SECONDS(CAST(ROUND(C.date) AS INT64))), WEEK(MONDAY))",
+            'monthly': "DATE_TRUNC(DATE(TIMESTAMP_SECONDS(CAST(ROUND(C.date) AS INT64))), MONTH)",
+            'daily': "DATE(DATE(TIMESTAMP_SECONDS(CAST(ROUND(C.date) AS INT64))))"
+        }
+        return expressions.get(granularity, expressions['daily'])
 
     def _get_table(self, table_name: str) -> Table:
         table_ref = self.dataset_ref.table(table_name)
@@ -68,7 +67,6 @@ class BigQueryClient:
         return self._execute_query(query)
     
     def get_table_rows(self, table_name, unique_ids):
-        table_name = TABLES[table_name]
         """Retrieve entire rows from a specified table based on unique IDs."""
         query = f"""
         SELECT *
@@ -118,7 +116,7 @@ class BigQueryClient:
     def get_protocol_data(self, protocol_name: str, granularity: str) -> pd.DataFrame:
         """Retrieve data for a specific protocol with granularity."""
 
-        date_trunc_expr = self.get_date_trunc_expr(granularity)
+        date_trunc_expr = self._get_date_trunc_expr(granularity)
 
         # Construct the SQL query
         query = f"""
@@ -153,44 +151,6 @@ class BigQueryClient:
             id
         """
         return self._execute_query(query)
-
-    def get_data_with_type(self, table_name: str, granularity: str) -> pd.DataFrame:
-            """Retrieve data from table C with the specified granularity and include 'type' from table A."""
-
-            date_trunc_expr = self._get_date_trunc_expr(granularity)
-
-            query = f"""
-            SELECT 
-                {date_trunc_expr} as aggregated_date,
-                C.id,
-                A.name as protocol_name,
-                A.category,
-                A.type,
-                C.chain_name,
-                C.token_name,
-                SUM(C.quantity) as total_quantity,
-                SUM(C.value_usd) as total_value_usd
-            FROM 
-                `{self.dataset_ref.dataset_id}.{TABLES[table_name]}` C
-            INNER JOIN 
-                `{self.dataset_ref.dataset_id}.{TABLES['A']}` A ON C.id = A.id
-            WHERE 
-                C.quantity > 0 AND
-                C.value_usd > 0
-            GROUP BY 
-                aggregated_date,
-                C.id,
-                protocol_name,
-                category,
-                type,
-                chain_name,
-                token_name
-            ORDER BY 
-                aggregated_date,
-                C.id
-            """
-
-            return self._execute_query(query)
     
     def compare_months(self, year1: int, month1: int, year2: int, month2: int, table: str = TABLES['C']) -> pd.DataFrame:
         """Compare monthly aggregated data between two months."""
@@ -281,6 +241,17 @@ class BigQueryClient:
                 raise ValueError("The column 'token_name' does not exist in the specified table.") from e
             else:
                 raise
+
+    def get_token_frequency(self, table: str) -> pd.DataFrame:
+        """Retrieve the frequency of each token name from a specified table."""
+        query = f"""
+        SELECT token_name, COUNT(*) as frequency
+        FROM `{self.dataset_ref.dataset_id}.{table}`
+        GROUP BY token_name
+        ORDER BY frequency DESC
+        """
+        return self._execute_query(query)
+
 
     
 if __name__ == '__main__':

@@ -7,9 +7,13 @@ TOP_N = 8
 
 CACHE_DIR = "data/tvl/cache/"
 
+MAPPING_PATH = 'data/mapping/'
+
 QUERY_PROJECT = "platinum-analog-402701"
 
 QUERY_DATA_SET = "tvl_all"
+
+SIMILARIY_THRESHOLD = 0.2
 
 TABLES = {
     "A": "A_protocols",

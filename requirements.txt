@@ -26,3 +26,4 @@ kaleido
 web3
 
 pyvis
+python-dateutil

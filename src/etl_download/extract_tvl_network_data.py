@@ -38,14 +38,14 @@ tokens_to_map = [
     if token not in known_mapping.keys()
 ]
 random_mapping = {token: random.choice(protocols) for token in tokens_to_map}
-PRIMARY_TOKEN_TO_PROTOCOL_mapping = {**known_mapping, **random_mapping}
+PRIMARY_token_to_protocol = {**known_mapping, **random_mapping}
 
 # 5. Construct the network graph
 G = nx.DiGraph()
 for protocol in protocols:
     node_size = random.randint(10, 500)
     G.add_node(protocol, size=node_size)
-for token, protocol in PRIMARY_TOKEN_TO_PROTOCOL_mapping.items():
+for token, protocol in PRIMARY_token_to_protocol.items():
     target_protocol = random.choice([p for p in protocols if p != protocol])
     edge_width = random.randint(1, 10)
     G.add_edge(protocol, target_protocol, weight=edge_width)

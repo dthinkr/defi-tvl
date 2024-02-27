@@ -28,7 +28,7 @@ def load_token_distribution(_bq: BigQueryClient, token_name: str, granularity: s
     unique_ids = token_distribution_df['id'].unique()
 
     # Retrieve rows from table A based on unique IDs
-    table_a_df = _bq.get_table_rows('A', unique_ids)
+    table_a_df = _bq.get_table_rows(TABLES['A'], unique_ids)
     
     return token_distribution_df, table_a_df
 
@@ -236,21 +236,6 @@ def main():
                 st.altair_chart(ts_chart, use_container_width=True)
             else:
                 st.write("No data available for the specified protocol.")
-
-        # Initialize or increment the date in session state
-        if 'selected_date' not in st.session_state:
-            # Initialize with today's date if not already in session state
-            st.session_state.selected_date = datetime.today()
-        else:
-            # Increment the date by one day
-            st.session_state.selected_date += timedelta(days=1)
-
-        # Display the date and a button to increment
-        st.write("Current date:", st.session_state.selected_date)
-        if st.button('Increment date by one day'):
-            # This will trigger the increment in the session state above
-            pass
-
 
     # with tab2: 
     #     st.write("# Chord Diagram: Inter-Protocol Locked Values")

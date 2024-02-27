@@ -2,7 +2,6 @@
     amounts to the aggregated data in table D"""
 
 import pytest
-from google.cloud import bigquery
 import pandas as pd
 from config.query import BigQueryClient
 from config.config import TABLES
@@ -71,7 +70,7 @@ def get_monthly_avg_from_table_d(protocol_id, year, month):
 
 # Generate test cases dynamically
 protocol_names = get_random_protocol_names(n=5)
-test_cases = [(name, '2023', '2') for name in protocol_names]
+test_cases = [(name, '2023', '6') for name in protocol_names]
 
 
 @pytest.mark.parametrize("protocol_name,year,month", test_cases)
