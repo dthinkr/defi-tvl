@@ -4,7 +4,6 @@ import json
 from pyvis.network import Network
 from collections import defaultdict
 
-
 class NetworkVisualizer:
     def __init__(self, notebook=True, height="750px", width="100%", bgcolor="#FFFFFF", font_color="black", directed=True, cdn_resources="in_line"):
         self.plot_settings = """

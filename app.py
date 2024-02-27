@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 plt.rcParams['figure.dpi'] = 300
-from config.plotting_governance import TokenDistributionVisualizer
+from config.plot_governance import TokenDistributionVisualizer
 
 import pandas as pd
 import streamlit as st
@@ -14,7 +14,7 @@ import itertools as itertools
 from config.config import TOP_N, original_names, abbreviated_names, TABLES
 from config.query import BigQueryClient
 from config.chord import ChordDiagramData
-from config.plotting_network import NetworkVisualizer
+from config.plot_network import NetworkVisualizer
 
 from datetime import datetime, timedelta
 
