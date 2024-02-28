@@ -308,10 +308,6 @@ def main():
         st.write("# Network Diagram")
         st.write("This shows the global monthly token locked changes across all DeFi protocols")
 
-        etl = ETLNetwork(bq=bq)
-
-        st.write(len(etl.rev_map), len(etl.categories), len(etl.id_to_info))
-
         # Define the range of months for the slider
         start_date = datetime(2020, 1, 1)
         end_date = datetime.now()
@@ -329,7 +325,22 @@ def main():
 
         # Fetch the network data for the selected month
         network_data = get_network_data(selected_month, TOP_X=top_x, mode=selected_mode)
+        # unique_ids = len(set(item['id'] for item in network_data['nodes']))
+        # total_size = sum(item['size'] for item in network_data['nodes'])
 
+        # if total_size >= 1e9:
+        #     size_in_b_or_m = f"{int(total_size / 1e9)} billion"
+        # elif total_size >= 1e6:
+        #     size_in_b_or_m = f"{int(total_size / 1e6)} million"
+        # else:
+        #     size_in_b_or_m = f"{int(total_size)}"  # Less than a million, keep as is
+
+        
+        # st.write('## Network Summary')
+        # st.write(f'Total nodes: {unique_ids}, Total size: {size_in_b_or_m} USD')
+
+
+        st.write('## Network Visualization')
         if network_data:
             # Display the network visualization
             html_content = display_network(network_data)
