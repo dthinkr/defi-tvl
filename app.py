@@ -217,9 +217,10 @@ def main():
             # #         targets=["area"],
             # #         redefine={"data": data_for_observable,})
             
-            extracted_df = token_distribution_df[['aggregated_date', 'protocol_name', 'type', 'total_value_usd']]
-            extracted_df.columns = ['date', 'name', 'category', 'value']
-            extracted_df.loc[:, 'value'] = (extracted_df['value'] / 1000000).astype(int)
+            extracted_df = token_distribution_df[['aggregated_date', 'protocol_name', 'type', 'total_value_usd']].copy()
+            extracted_df.columns = ['date', 'name', 'category', 'value']  # This is usually fine as it's a direct operation on the DataFrame.
+            extracted_df.loc[:, 'value'] = extracted_df.loc[:, 'value'] / 1000000  # Convert to millions and ensure operation is explicit.
+            extracted_df.loc[:, 'value'] = extracted_df.loc[:, 'value'].astype(int)  # Convert to int explicitly.
 
             # Convert 'date' to datetime and filter out dates before 2021-01-01
             extracted_df.loc[:, 'date'] = pd.to_datetime(extracted_df['date'])
