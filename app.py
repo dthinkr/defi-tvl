@@ -19,6 +19,7 @@ from config.plot_network import NetworkVisualizer
 import subprocess
 import requests
 from datetime import datetime, timedelta
+import socket
 
 
 def start_uvicorn():
@@ -26,10 +27,12 @@ def start_uvicorn():
     subprocess.Popen(uvicorn_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 
-def is_uvicorn_running():
-    result = subprocess.run(["lsof", "-i:8000"], stdout=subprocess.PIPE, text=True)
-    return "uvicorn" in result.stdout
+def is_port_in_use(port):
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        return s.connect_ex(('localhost', port)) == 0
 
+def is_uvicorn_running():
+    return is_port_in_use(8000)
 
 @st.cache_data
 def get_network_data(year_month, TOP_X=50, mode='usd'):
