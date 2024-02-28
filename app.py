@@ -183,7 +183,11 @@ def main():
 
     tab1, tab2, tab3 = st.tabs(['Token Analysis', 'Chord Diagram', 'Network Diagram'])
 
+    if not is_uvicorn_running():
+        start_uvicorn()
+
     with tab1: 
+
 
         st.write("# Token Analysis")
 
@@ -301,9 +305,6 @@ def main():
         #         redefine={"data": day_data})
 
     with tab3:
-        if not is_uvicorn_running():
-            start_uvicorn()
-
         st.write("# Network Diagram")
         st.write("This shows the global monthly token locked changes across all DeFi protocols")
 
