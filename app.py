@@ -219,11 +219,9 @@ def main():
             
             extracted_df = token_distribution_df[['aggregated_date', 'protocol_name', 'type', 'total_value_usd']].copy()
             extracted_df.columns = ['date', 'name', 'category', 'value']  # This is usually fine as it's a direct operation on the DataFrame.
-            extracted_df.loc[:, 'value'] = extracted_df.loc[:, 'value'] / 1000000  # Convert to millions and ensure operation is explicit.
-            extracted_df.loc[:, 'value'] = extracted_df.loc[:, 'value'].astype(int)  # Convert to int explicitly.
-
-            # Convert 'date' to datetime and filter out dates before 2021-01-01
-            extracted_df.loc[:, 'date'] = pd.to_datetime(extracted_df['date'])
+            extracted_df['value'] = extracted_df['value'] / 1e6
+            extracted_df['value'] = extracted_df['value'].astype(int)
+            extracted_df['date'] = pd.to_datetime(extracted_df['date'])
             extracted_df = extracted_df[extracted_df['date'] >= pd.to_datetime('2021-01-01')]
             
             # Adjust all dates to the first day of their respective months
