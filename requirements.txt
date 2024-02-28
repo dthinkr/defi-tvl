@@ -29,3 +29,5 @@ pyvis
 python-dateutil
 fastapi
 sklearn
+uvicorn
+scikit-learn
