@@ -20,6 +20,7 @@ import subprocess
 import requests
 from datetime import datetime, timedelta
 import socket
+from src.etl_network import ETLNetwork
 
 
 def start_uvicorn():
@@ -306,6 +307,10 @@ def main():
     with tab3:
         st.write("# Network Diagram")
         st.write("This shows the global monthly token locked changes across all DeFi protocols")
+
+        etl = ETLNetwork(bq=bq)
+
+        st.write(len(etl.rev_map), len(etl.categories), len(etl.id_to_info))
 
         # Define the range of months for the slider
         start_date = datetime(2020, 1, 1)
