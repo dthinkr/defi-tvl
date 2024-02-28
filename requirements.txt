@@ -28,6 +28,5 @@ web3
 pyvis
 python-dateutil
 fastapi
-sklearn
 uvicorn
 scikit-learn
