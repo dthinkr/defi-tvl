@@ -9,14 +9,56 @@ import altair as alt
 from streamlit_observable import observable
 
 import numpy as np
-import itertools as itertools
+import itertools
 
-from config.config import TOP_N, original_names, abbreviated_names, TABLES
+from config.config import CUSTOM_COLORS, TOP_N, original_names, abbreviated_names, TABLES, NETWORK_PRELIMINARIES
 from config.query import BigQueryClient
 from config.chord import ChordDiagramData
 from config.plot_network import NetworkVisualizer
 
+import subprocess
+import requests
 from datetime import datetime, timedelta
+
+
+def start_uvicorn():
+    uvicorn_command = "uvicorn endpoint:app --host 0.0.0.0 --port 8000"
+    subprocess.Popen(uvicorn_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+
+def is_uvicorn_running():
+    result = subprocess.run(["lsof", "-i:8000"], stdout=subprocess.PIPE, text=True)
+    return "uvicorn" in result.stdout
+
+
+@st.cache_data
+def get_network_data(year_month, TOP_X=50, mode='usd'):
+    url = f"http://127.0.0.1:8000/network-json/{year_month}?TOP_X={TOP_X}&mode={mode}"
+    response = requests.get(url)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        st.error("Failed to retrieve network data")
+        return None
+
+@st.cache_data
+def display_network(network_json):
+    unique_categories = set(node['category'] for node in network_json['nodes'])
+    color_cycle = itertools.cycle(CUSTOM_COLORS)    
+    category_colors = {category: next(color_cycle) for category in unique_categories}
+
+    visualizer = NetworkVisualizer()
+    # display_color_legend(category_colors)
+    return visualizer.visualize_network(network_json, category_colors)
+
+
+# The display_color_legend function remains unchanged
+def display_color_legend(category_colors):
+    raise NotImplementedError("Too many categories identified. Needs to change logic.")
+    st.write("## Color Legend for Nodes:")
+    st.write(category_colors)
+    for category, color in category_colors.items():
+        st.markdown(f"- ![{category}](https://via.placeholder.com/15/{color[1:]}/000000?text=+) `{category}`", unsafe_allow_html=True)
 
 @st.cache_data
 def load_token_distribution(_bq: BigQueryClient, token_name: str, granularity: str):
@@ -237,84 +279,53 @@ def main():
             else:
                 st.write("No data available for the specified protocol.")
 
-    # with tab2: 
-    #     st.write("# Chord Diagram: Inter-Protocol Locked Values")
-    #     st.write("## Temp Removed, Improving Performance")
-    #     # chord_data, unique_dates_reversed, day_data = get_chord_and_day_data('data/tvl/db/tb.parquet')
+    with tab2: 
+        st.write("# Chord Diagram: Inter-Protocol Locked Values")
+        st.write("## Temp Removed, Improving Performance")
+        # chord_data, unique_dates_reversed, day_data = get_chord_and_day_data('data/tvl/db/tb.parquet')
         
-    #     # # Dropdown to select a specific date, defaulting to the first (latest) date
-    #     # selected_date = st.selectbox("Select a date:", options=unique_dates_reversed, index=0)
+        # # Dropdown to select a specific date, defaulting to the first (latest) date
+        # selected_date = st.selectbox("Select a date:", options=unique_dates_reversed, index=0)
 
-    #     # # If selected date is not the latest, get data for the selected date
-    #     # if selected_date != unique_dates_reversed[0]:
-    #     #     day_data = chord_data.get_data_for_day(selected_date)
+        # # If selected date is not the latest, get data for the selected date
+        # if selected_date != unique_dates_reversed[0]:
+        #     day_data = chord_data.get_data_for_day(selected_date)
 
-    #     # day_data["names"] = abbreviated_names
-    #     # observable("Chord", 
-    #     #         notebook="@venvox-ws/chord-diagram", 
-    #     #         targets=["chart"],
-    #     #         redefine={"data": day_data})
-    
-    # long_markdown = """
-    #                 ### Preliminaries
+        # day_data["names"] = abbreviated_names
+        # observable("Chord", 
+        #         notebook="@venvox-ws/chord-diagram", 
+        #         targets=["chart"],
+        #         redefine={"data": day_data})
 
-    #                 Let:
+    with tab3:
+        if not is_uvicorn_running():
+            start_uvicorn()
 
-    #                 - $\mathcal{A}$ represent the set of all protocols, where each protocol $a \in \mathcal{A}$ is identified by a unique identifier $id_a$, and may have associated attributes such as name and URL.
-    #                 - $\mathcal{C}$ denote the set of time-based data entries, where each entry $c \in \mathcal{C}$ corresponds to a token and includes information on the token's name, the change in its locked value over a specified time interval, and possibly its association with a protocol in $\mathcal{A}$.
+        st.write("# Network Diagram")
+        st.write("This shows the global monthly token locked changes across all DeFi protocols")
 
-    #                 ### Categorization Function
+        # Define the range of months for the slider
+        start_date = datetime(2020, 1, 1)
+        end_date = datetime.now()
+        date_range = pd.date_range(start_date, end_date, freq='MS')  # 'MS' means month start frequency
 
-    #                 Define a categorization function $\phi: \mathcal{C} \\rightarrow \mathcal{K}$, which maps each token $c$ to a category $k \in \mathcal{K} = \{ rev\_map, LP, UNKNOWN, Other \}$ based on predefined rules related to the token's name and presence in reverse mappings or lists.
+        # Convert date_range to list of strings for display
+        options = [date.strftime("%Y-%m") for date in date_range]
+        
+        # Create a slider for month selection
+        selected_month = st.select_slider("Select Month:", options=options, value=options[20])
+        
+        top_x = st.number_input("Select the number of nodes shown, the rest are aggregated:", min_value=1, max_value=500, value=50, step=10)
+        mode_options = ['usd', 'qty']
+        selected_mode = st.selectbox("Display token amount or token USD value:", options=mode_options, index=0)  # Default to 'usd'
 
-    #                 ### Processing Functions
+        # Fetch the network data for the selected month
+        network_data = get_network_data(selected_month, TOP_X=top_x, mode=selected_mode)
 
-    #                 1. **Unknown Tokens Processing** $\psi_{UNKNOWN}: \mathcal{C}_{UNKNOWN} \\rightarrow \mathcal{A}$: For tokens categorized as UNKNOWN, this function attempts to match token names to Ethereum addresses and subsequently to protocol identifiers in $\mathcal{A}$, effectively refining $\mathcal{C}_{UNKNOWN}$ to a more identifiable subset of $\mathcal{A}$.
-
-    #                 2. **Other Tokens Processing** $\psi_{Other}: \mathcal{C}_{Other} \\rightarrow \mathcal{A} \cup \{ null \}$: Applies manual mappings and filters to tokens in the Other category, potentially mapping them to protocols in $\mathcal{A}$ or excluding them (mapped to null).
-
-    #                 3. **Reverse Mapping Application** $\psi_{rev\_map}: \mathcal{C}_{rev\_map} \\rightarrow \mathcal{A}$: Directly maps tokens in the rev_map category to protocols in $\mathcal{A}$ using the provided reverse mapping.
-
-    #                 ### Merging and Sorting
-
-    #                 After processing, the subsets of $\mathcal{C}$ are merged into a single set $\mathcal{C}_{merged}$, which is then sorted based on the magnitude of value change, resulting in $\mathcal{C}_{sorted}$.
-
-    #                 ### Graph Construction
-
-    #                 Construct a directed graph $G = (V, E)$ where:
-
-    #                 - $V$ corresponds to protocols in $\mathcal{A}$, with each node $v$ representing a protocol.
-    #                 - $E$ consists of directed edges between nodes in $V$, with each edge $e(v_i, v_j)$ representing the flow of value from protocol $v_i$ to protocol $v_j$, derived from $\mathcal{C}_{sorted}$. The weight of each edge is proportional to the magnitude of the value change.
-
-    #                 """
-
-    # with tab3:
-    #     st.write("# Network Diagram")
-    #     st.write("This shows the global monthly token locked changes across all DeFi protocols")
-    #     st.markdown("""
-    #     **Color Legend for Nodes:**
-    #     - ![#ffb71a](https://via.placeholder.com/15/ffb71a/000000?text=+) `Yellow`: Platform protocols (with complex lending and borrowing)
-    #     - ![#ff4b4b](https://via.placeholder.com/15/ff4b4b/000000?text=+) `Red`: Token-only protocols
-    #     """, unsafe_allow_html=True)
-    #     year = st.selectbox("Select Year:", options=[2019, 2020, 2021, 2022, 2023], index=4)  # Example years, adjust as needed
-    #     month = st.selectbox("Select Starting Month:", options=list(range(1, 13)), format_func=lambda x: f"{x:02d}", index=8)
-
-    #     # Calculate the ending month and year
-    #     if month == 12:
-    #         end_month = 1
-    #         end_year = year + 1
-    #     else:
-    #         end_month = month + 1
-    #         end_year = year
-
-    #     A = retrieve_table_A(bq)
-    #     C = table_C_compare_months(bq, str(year), f"{month:02d}", str(end_year), f"{end_month:02d}")
-    #     categorizer = NetworkVisualizer(C)
-    #     result = categorizer.process(A)
-    #     st.write(result.head(20))
-    #     html_content = categorizer.plot_network(result)
-    #     st.components.v1.html(html_content, height=600, scrolling=True)
-    #     st.markdown(long_markdown, unsafe_allow_html=True)
+        if network_data:
+            # Display the network visualization
+            html_content = display_network(network_data)
+            st.components.v1.html(html_content, height=750, scrolling=True)
 
 if __name__ == "__main__":
     main()

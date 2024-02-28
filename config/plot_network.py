@@ -1,6 +1,3 @@
-import pandas as pd
-import re
-import json
 from pyvis.network import Network
 from collections import defaultdict
 
@@ -67,4 +64,4 @@ class NetworkVisualizer:
             self.net.add_edge(source, target, title=title, value=self.normalize_size(data['size'], all_edge_sizes, 1, 10))
 
         self.net.set_options(self.plot_settings)
-        self.net.write_html("network.html")
+        return self.net.generate_html()
