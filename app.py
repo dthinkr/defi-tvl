@@ -331,5 +331,7 @@ def main():
             html_content = display_network(network_data)
             st.components.v1.html(html_content, height=750, scrolling=True)
 
+        st.write(NETWORK_PRELIMINARIES)
+
 if __name__ == "__main__":
     main()
