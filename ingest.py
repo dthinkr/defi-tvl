@@ -9,6 +9,7 @@ from prefect import task, flow
 from config.config import TABLES, MD_TOKEN
 import duckdb
 import asyncio
+import psutil
 
 def load_config():
     with open("config.yaml", "r") as file:
@@ -57,9 +58,7 @@ def download_tvl_data():
     all_protocol_slugs = get_all_protocol_slugs()
     if MAX_SLUGS is not None:
         all_protocol_slugs = all_protocol_slugs[:MAX_SLUGS]
-    
     failed_slugs = []
-
     for protocol in all_protocol_slugs:
         url = f"{BASE_URL}protocol/{protocol}"
         data = fetch_data(url)
@@ -68,7 +67,6 @@ def download_tvl_data():
             save_data_to_file(data, filename)
         else:
             failed_slugs.append(protocol)
-
     if failed_slugs:
         with open(FAILED_SLUGS_FILE, "wb") as f:
             pickle.dump(failed_slugs, f)
@@ -90,7 +88,10 @@ def extract_token_tvl(file_path):
                     results.append([data['id'], chain_name, date, token_name, quantity, value_usd])
     except Exception as e:
         results.append([data.get('id', None), None, None, None, None, None])
-    return pd.DataFrame(results, columns=['id', 'chain_name', 'date', 'token_name', 'quantity', 'value_usd'])
+    df = pd.DataFrame(results, columns=['id', 'chain_name', 'date', 'token_name', 'quantity', 'value_usd'])
+    df['quantity'] = df['quantity'].astype('float64')
+    df['value_usd'] = df['value_usd'].astype('float64')
+    return df
 
 @task
 async def process_single_file(file_path):
@@ -123,23 +124,41 @@ async def download_and_process_single_protocol(slug):
         filename = os.path.join(DATA_DIR, f"{slug}.json")
         save_data_to_file(data, filename)
         await process_single_file.fn(filename)
-        # Upload the processed file to Motherduck
         processed_filename = filename.replace('.json', '.parquet')
         await upload_df_to_motherduck.fn(processed_filename, TABLES['C'])
+        os.remove(filename)
+        os.remove(processed_filename)
     else:
         with open(FAILED_SLUGS_FILE, "ab") as f:
             pickle.dump(slug, f)
 
+
+def _get_system_memory_info_gb():
+    mem = psutil.virtual_memory()
+    return mem.total / (1024.0 ** 3)  # Convert bytes to GB
+
+def _calculate_concurrent_tasks(memory_per_task_gb=20/200, safety_factor=1.2):
+    total_memory_gb = _get_system_memory_info_gb()
+    usable_memory_gb = total_memory_gb * safety_factor
+    max_concurrent_tasks_based_on_memory = int(usable_memory_gb / memory_per_task_gb)
+    return max_concurrent_tasks_based_on_memory
+
 @flow
 async def llama_ingest():
-    # Clear TABLE['C'] at the beginning
     await clear_motherduck_table([TABLES['A']])
     await download_protocol_headers()
     all_protocol_slugs = get_all_protocol_slugs()
-    if MAX_SLUGS is not None:
-        all_protocol_slugs = all_protocol_slugs[:MAX_SLUGS]
-    tasks = [download_and_process_single_protocol(slug) for slug in all_protocol_slugs]
-    await asyncio.gather(*tasks)
+
+    max_concurrent_tasks = _calculate_concurrent_tasks()
+    total_slugs_to_process = len(all_protocol_slugs) if MAX_SLUGS is None else min(len(all_protocol_slugs), MAX_SLUGS)
+
+    # Process all slugs in batches, respecting the memory constraints
+    for i in range(0, total_slugs_to_process, max_concurrent_tasks):
+        # Determine the slugs for the current batch
+        batch_slugs = all_protocol_slugs[i:i+max_concurrent_tasks]
+        # Create and await tasks for the current batch
+        tasks = [download_and_process_single_protocol(slug) for slug in batch_slugs]
+        await asyncio.gather(*tasks)
 
 if __name__ == "__main__":
     asyncio.run(llama_ingest())

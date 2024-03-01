@@ -37,3 +37,6 @@ yaml
 pandas
 prefect
 duckdb==0.9.2
+pyarrow
+fastparquet
+psutil
