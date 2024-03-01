@@ -8,6 +8,7 @@ import glob
 from prefect import task, flow
 from config.config import TABLES, MD_TOKEN
 import duckdb
+import asyncio
 
 def load_config():
     with open("config.yaml", "r") as file:
@@ -28,16 +29,13 @@ def fetch_data(url):
     response = requests.get(url)
     if response.status_code == 200:
         return response.json()
-    else:
-        print(f"Error: {response.status_code}")
-        return None
 
 def save_data_to_file(data, filename):
     with open(filename, "w") as f:
         json.dump(data, f, indent=4)
 
 @task
-def download_protocol_headers():
+async def download_protocol_headers():
     url = f"{BASE_URL}protocols"
     data = fetch_data(url)
     if data:
@@ -46,6 +44,7 @@ def download_protocol_headers():
         for col in df.select_dtypes(include=['object']).columns:
             df[col] = df[col].astype(str)
         df.to_parquet(PROTOCOL_HEADERS_PARQUET, index=False)
+        await upload_df_to_motherduck.fn(PROTOCOL_HEADERS_PARQUET, TABLES['A'])
     return data
 
 def get_all_protocol_slugs():
@@ -53,7 +52,7 @@ def get_all_protocol_slugs():
         headers = json.load(f)
     return [protocol["slug"] for protocol in headers]
 
-@task
+@task(retries=3, retry_delay_seconds=[1, 10, 100])
 def download_tvl_data():
     all_protocol_slugs = get_all_protocol_slugs()
     if MAX_SLUGS is not None:
@@ -73,9 +72,6 @@ def download_tvl_data():
     if failed_slugs:
         with open(FAILED_SLUGS_FILE, "wb") as f:
             pickle.dump(failed_slugs, f)
-        print(f"\nFailed to fetch data for {len(failed_slugs)} protocols. Check '{FAILED_SLUGS_FILE}' for the list.")
-    else:
-        print("Successfully downloaded TVL data for all protocols.")
 
 def extract_token_tvl(file_path):
     results = []
@@ -93,31 +89,60 @@ def extract_token_tvl(file_path):
                     value_usd = tokens_in_usd_dict.get(date, {}).get(token_name, 0)
                     results.append([data['id'], chain_name, date, token_name, quantity, value_usd])
     except Exception as e:
-        print(f"Error in extract_token_tvl: {e}")
         results.append([data.get('id', None), None, None, None, None, None])
     return pd.DataFrame(results, columns=['id', 'chain_name', 'date', 'token_name', 'quantity', 'value_usd'])
 
 @task
-def process_downloaded_data():
-    folder_path = os.path.join(DATA_DIR, '*.json')
-    json_files = glob.glob(folder_path)
-    dfs = [extract_token_tvl(file) for file in json_files]
-    unified_df = pd.concat(dfs, ignore_index=True)
-    unified_df.to_parquet(os.path.join(DATA_DIR, f"{TABLES['C']}.parquet"), index=False)
+async def process_single_file(file_path):
+    df = extract_token_tvl(file_path)
+    # Generate a unique file name for each protocol
+    unique_file_name = os.path.basename(file_path).replace('.json', '_processed.parquet')
+    parquet_file_path = os.path.join(DATA_DIR, unique_file_name)
+    df.to_parquet(parquet_file_path, index=False)
 
+async def clear_motherduck_table(tables: list):
+    con = duckdb.connect(f'md:?motherduck_token={MD_TOKEN}')
+    for table in tables:
+        con.execute(f"CREATE TABLE IF NOT EXISTS {table} (id INTEGER)")
+        con.execute(f"TRUNCATE TABLE {table}")
 
 @task
-def upload_df_to_motherduck():
-    path = os.path.join(DATA_DIR, f"{TABLES['C']}.parquet")
+async def upload_df_to_motherduck(file_path, table_name):
+    df = pd.read_parquet(file_path)
     con = duckdb.connect(f'md:?motherduck_token={MD_TOKEN}')
-    con.execute(f"CREATE TABLE IF NOT EXISTS {TABLES['C']} AS SELECT * FROM '{path}'")
+    con.execute(f"INSERT INTO {table_name} SELECT * FROM '{file_path}'")
+
+# Step 3: Modify download_and_process_single_protocol to call upload_df_to_motherduck after processing
+@task
+async def download_and_process_single_protocol(slug):
+    url = f"{BASE_URL}protocol/{slug}"
+    data = fetch_data(url)
+    if data:
+        filename = os.path.join(DATA_DIR, f"{slug}.json")
+        save_data_to_file(data, filename)
+        await process_single_file.fn(filename)
+        # Upload the processed file to Motherduck
+        processed_filename = filename.replace('.json', '_processed.parquet')
+        await upload_df_to_motherduck.fn(processed_filename, TABLES['C'])
+    else:
+        with open(FAILED_SLUGS_FILE, "ab") as f:
+            pickle.dump(slug, f)
+
 
 @flow
-def run_data_ingestion():
-    download_protocol_headers()
-    download_tvl_data()
-    process_downloaded_data() 
-    upload_df_to_motherduck()
+async def run_data_ingestion():
+    # Clear TABLE['C'] at the beginning
+    await clear_motherduck_table([TABLES['A'],TABLES['C']])
+    await download_protocol_headers()
+    all_protocol_slugs = get_all_protocol_slugs()
+    if MAX_SLUGS is not None:
+        all_protocol_slugs = all_protocol_slugs[:MAX_SLUGS]
+
+    tasks = [download_and_process_single_protocol(slug) for slug in all_protocol_slugs]
+    await asyncio.gather(*tasks)
+
+# Ensure clear_motherduck_table is not async; it's a synchronous operation.
+# Adjust the rest of the code to fit this new approach.
 
 if __name__ == "__main__":
-    run_data_ingestion()
+    asyncio.run(run_data_ingestion())
