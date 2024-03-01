@@ -131,7 +131,7 @@ async def download_and_process_single_protocol(slug):
             pickle.dump(slug, f)
 
 @flow
-async def run_data_ingestion():
+async def llama_ingest():
     # Clear TABLE['C'] at the beginning
     await clear_motherduck_table([TABLES['A']])
     await download_protocol_headers()
@@ -142,4 +142,4 @@ async def run_data_ingestion():
     await asyncio.gather(*tasks)
 
 if __name__ == "__main__":
-    asyncio.run(run_data_ingestion())
+    asyncio.run(llama_ingest())
