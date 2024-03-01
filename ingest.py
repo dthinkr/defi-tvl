@@ -138,10 +138,8 @@ async def run_data_ingestion():
     all_protocol_slugs = get_all_protocol_slugs()
     if MAX_SLUGS is not None:
         all_protocol_slugs = all_protocol_slugs[:MAX_SLUGS]
-
     tasks = [download_and_process_single_protocol(slug) for slug in all_protocol_slugs]
     await asyncio.gather(*tasks)
-
 
 if __name__ == "__main__":
     asyncio.run(run_data_ingestion())
