@@ -96,23 +96,25 @@ def extract_token_tvl(file_path):
 async def process_single_file(file_path):
     df = extract_token_tvl(file_path)
     # Generate a unique file name for each protocol
-    unique_file_name = os.path.basename(file_path).replace('.json', '_processed.parquet')
+    unique_file_name = os.path.basename(file_path).replace('.json', '.parquet')
     parquet_file_path = os.path.join(DATA_DIR, unique_file_name)
     df.to_parquet(parquet_file_path, index=False)
 
 async def clear_motherduck_table(tables: list):
     con = duckdb.connect(f'md:?motherduck_token={MD_TOKEN}')
     for table in tables:
-        con.execute(f"CREATE TABLE IF NOT EXISTS {table} (id INTEGER)")
-        con.execute(f"TRUNCATE TABLE {table}")
-
+        exists = con.execute(f"SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = '{table}')").fetchone()[0]
+        if exists:
+            con.execute(f"DELETE FROM {table}")
+        
 @task
 async def upload_df_to_motherduck(file_path, table_name):
-    df = pd.read_parquet(file_path)
+    """TODO: WRITE WRITE CONFCLIT WHEN TABLE C DOES NOT EXIST. 
+    duckdb.duckdb.TransactionException: TransactionContext Error: Catalog write-write conflict on create with "C_protocol_token_tvl"""
     con = duckdb.connect(f'md:?motherduck_token={MD_TOKEN}')
+    # con.execute(f"CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * FROM '{file_path}'")
     con.execute(f"INSERT INTO {table_name} SELECT * FROM '{file_path}'")
 
-# Step 3: Modify download_and_process_single_protocol to call upload_df_to_motherduck after processing
 @task
 async def download_and_process_single_protocol(slug):
     url = f"{BASE_URL}protocol/{slug}"
@@ -122,17 +124,16 @@ async def download_and_process_single_protocol(slug):
         save_data_to_file(data, filename)
         await process_single_file.fn(filename)
         # Upload the processed file to Motherduck
-        processed_filename = filename.replace('.json', '_processed.parquet')
+        processed_filename = filename.replace('.json', '.parquet')
         await upload_df_to_motherduck.fn(processed_filename, TABLES['C'])
     else:
         with open(FAILED_SLUGS_FILE, "ab") as f:
             pickle.dump(slug, f)
 
-
 @flow
 async def run_data_ingestion():
     # Clear TABLE['C'] at the beginning
-    await clear_motherduck_table([TABLES['A'],TABLES['C']])
+    await clear_motherduck_table([TABLES['A']])
     await download_protocol_headers()
     all_protocol_slugs = get_all_protocol_slugs()
     if MAX_SLUGS is not None:
@@ -141,8 +142,6 @@ async def run_data_ingestion():
     tasks = [download_and_process_single_protocol(slug) for slug in all_protocol_slugs]
     await asyncio.gather(*tasks)
 
-# Ensure clear_motherduck_table is not async; it's a synchronous operation.
-# Adjust the rest of the code to fit this new approach.
 
 if __name__ == "__main__":
     asyncio.run(run_data_ingestion())
