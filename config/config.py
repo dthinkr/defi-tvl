@@ -17,6 +17,8 @@ SIMILARIY_THRESHOLD = 0.2
 CUSTOM_COLORS = ["#ecdab0", "#e9c8b1", "#dbb1c3", 
                  "#b5bbe7", "#b6cfce", "#d8d9dd"]
 
+MD_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzZXNzaW9uIjoidmVudm9vb28uZ21haWwuY29tIiwiZW1haWwiOiJ2ZW52b29vb0BnbWFpbC5jb20iLCJ1c2VySWQiOiI4NjIyNzk3YS05ZDkzLTQ0MTYtYjhlNy0wNTdiMDFkNjc1NjEiLCJpYXQiOjE3MDYwNTk3MjgsImV4cCI6MTczNzYxNzMyOH0.QhvzD9nk5C3L-28u5gfZXqJosOvIpV-S6ElKwp5HeU4'
+
 TABLES = {
     "A": "A_protocols",
     "B": "B_protocol_chain_tvl",

@@ -1,5 +1,5 @@
 altair==5.1.2
-duckdb==0.9.1
+duckdb==0.9.2
 networkx==3.1
 pandas==1.5.3
 pandas_profiling==3.2.0
