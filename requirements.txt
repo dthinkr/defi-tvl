@@ -30,3 +30,4 @@ python-dateutil
 fastapi
 uvicorn
 scikit-learn
+prefect

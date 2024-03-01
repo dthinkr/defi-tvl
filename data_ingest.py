@@ -2,7 +2,6 @@ import requests
 import json
 import os
 import yaml
-from tqdm import tqdm
 import pickle
 from prefect import task, flow
 
@@ -54,7 +53,7 @@ def download_tvl_data(base_url, max_slugs=None):
     
     failed_slugs = []
 
-    for protocol in tqdm(all_protocol_slugs, desc="Downloading TVL data", unit="protocol"):
+    for protocol in all_protocol_slugs:
         url = f"{base_url}protocol/{protocol}"
         data = fetch_data(url)
         if data:
