@@ -319,7 +319,7 @@ def main():
         # Create a slider for month selection
         selected_month = st.select_slider("Select Month:", options=options, value=options[20])
         
-        top_x = st.number_input("Select the number of nodes shown, the rest are aggregated:", min_value=1, max_value=500, value=50, step=10)
+        top_x = st.number_input("Select the number of nodes shown, the rest are aggregated:", min_value=1, max_value=500, value=500, step=10)
         mode_options = ['usd', 'qty']
         selected_mode = st.selectbox("Display token amount or token USD value:", options=mode_options, index=0)  # Default to 'usd'
 
