@@ -1,0 +1,3 @@
+data_dir: "data/llama"
+base_url: "https://api.llama.fi/"
+max_slugs: 10
