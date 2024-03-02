@@ -1,4 +1,4 @@
 data_dir: "data/llama"
 base_dir: "data"
 base_url: "https://api.llama.fi/"
-max_slugs: 1000
+max_slugs: 
