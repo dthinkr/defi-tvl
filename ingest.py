@@ -137,7 +137,7 @@ def _get_system_memory_info_gb():
     mem = psutil.virtual_memory()
     return mem.total / (1024.0 ** 3)  # Convert bytes to GB
 
-def _calculate_concurrent_tasks(memory_per_task_gb=20/200, safety_factor=1.2):
+def _calculate_concurrent_tasks(memory_per_task_gb=20/200, safety_factor=0.6):
     total_memory_gb = _get_system_memory_info_gb()
     usable_memory_gb = total_memory_gb * safety_factor
     max_concurrent_tasks_based_on_memory = int(usable_memory_gb / memory_per_task_gb)
