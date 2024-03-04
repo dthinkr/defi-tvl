@@ -7,7 +7,8 @@ from google.oauth2.service_account import Credentials
 from typing import Optional
 import pandas as pd
 import streamlit as st
-from .config import TABLES
+from .config import TABLES, MD_TOKEN
+import duckdb
 
 import sys
 import os
@@ -55,14 +56,17 @@ class BigQueryClient:
         formatted_time = last_modified_time.strftime('%Y-%m-%d %H:%M:%S %Z')
         return formatted_time
 
+    def _get_table_name(self, table_name: str) -> str:
+        return f'{self.dataset_ref.dataset_id}.{table_name}'
+
     def get_dataframe(self, table_name: str, limit: Optional[int] = None) -> pd.DataFrame:
         if limit is not None:
             query = (
-                f"SELECT * FROM `{self.dataset_ref.dataset_id}.{table_name}` LIMIT {limit}"
+                f"SELECT * FROM {self._get_table_name(table_name)} LIMIT {limit}"
             )
         else:
             query = (
-                f"SELECT * FROM `{self.dataset_ref.dataset_id}.{table_name}`"
+                f"SELECT * FROM {self._get_table_name(table_name)}"
             )
         return self._execute_query(query)
     
@@ -70,7 +74,7 @@ class BigQueryClient:
         """Retrieve entire rows from a specified table based on unique IDs."""
         query = f"""
         SELECT *
-        FROM `{self.dataset_ref.dataset_id}.{table_name}`
+        FROM {self._get_table_name(table_name)}
         WHERE id IN ({', '.join(map(str, unique_ids))})
         """
         return self._execute_query(query)
@@ -93,9 +97,9 @@ class BigQueryClient:
             SUM(C.quantity) as total_quantity,
             SUM(C.value_usd) as total_value_usd
         FROM 
-            `{self.dataset_ref.dataset_id}.{TABLES['C']}` C
+            {self.dataset_ref.dataset_id}.{TABLES['C']} C
         INNER JOIN 
-            `{self.dataset_ref.dataset_id}.{TABLES['A']}` A ON C.id = A.id
+            {self.dataset_ref.dataset_id}.{TABLES['A']} A ON C.id = A.id
         WHERE 
             C.token_name = '{token_name}' AND
             C.quantity > 0 AND
@@ -131,9 +135,9 @@ class BigQueryClient:
             SUM(C.quantity) as total_quantity,
             SUM(C.value_usd) as total_value_usd
         FROM 
-            `{self.dataset_ref.dataset_id}.{TABLES['C']}` C
+            {self.dataset_ref.dataset_id}.{TABLES['C']} C
         INNER JOIN 
-            `{self.dataset_ref.dataset_id}.{TABLES['A']}` A ON C.id = A.id
+            {self.dataset_ref.dataset_id}.{TABLES['A']} A ON C.id = A.id
         WHERE 
             A.name = '{protocol_name}' AND
             C.quantity > 0 AND
@@ -164,7 +168,7 @@ class BigQueryClient:
                 AVG(quantity) AS qty_m1_avg,
                 AVG(value_usd) AS usd_m1_avg
             FROM
-                `{self.dataset_ref.dataset_id}.{table}`
+                {self._get_table_name(table)}
             WHERE
                 EXTRACT(YEAR FROM TIMESTAMP_SECONDS(CAST(date AS INT64))) = {year1} AND
                 EXTRACT(MONTH FROM TIMESTAMP_SECONDS(CAST(date AS INT64))) = {month1}
@@ -180,7 +184,7 @@ class BigQueryClient:
                 AVG(quantity) AS qty_m2_avg,
                 AVG(value_usd) AS usd_m2_avg
             FROM
-                `{self.dataset_ref.dataset_id}.{table}`
+                {self._get_table_name(table)}
             WHERE
                 EXTRACT(YEAR FROM TIMESTAMP_SECONDS(CAST(date AS INT64))) = {year2} AND
                 EXTRACT(MONTH FROM TIMESTAMP_SECONDS(CAST(date AS INT64))) = {month2}
@@ -221,7 +225,7 @@ class BigQueryClient:
             AVG(quantity) AS avg_quantity,
             AVG(value_usd) AS avg_value_usd
         FROM
-            `{self.dataset_ref.dataset_id}.{table}`
+            {self._get_table_name(table)}
         WHERE
             EXTRACT(YEAR FROM TIMESTAMP_SECONDS(CAST(date AS INT64))) = {year} AND
             EXTRACT(MONTH FROM TIMESTAMP_SECONDS(CAST(date AS INT64))) = {month}
@@ -233,7 +237,7 @@ class BigQueryClient:
     
     def get_unique_token_names(self, table: str) -> pd.DataFrame:
         """Fetch unique token names from a specified table."""
-        query = f"SELECT DISTINCT token_name FROM `{self.dataset_ref.dataset_id}.{table}`"
+        query = f"SELECT DISTINCT token_name FROM {self._get_table_name(table)}"
         try:
             return self._execute_query(query)
         except exceptions.BadRequest as e:
@@ -246,14 +250,27 @@ class BigQueryClient:
         """Retrieve the frequency of each token name from a specified table."""
         query = f"""
         SELECT token_name, COUNT(*) as frequency
-        FROM `{self.dataset_ref.dataset_id}.{table}`
+        FROM {self._get_table_name(table)}
         GROUP BY token_name
         ORDER BY frequency DESC
         """
         return self._execute_query(query)
 
 
-    
+
+class MotherduckClient(BigQueryClient):
+    def __init__(self) -> None:
+        super().__init__()  # Initialize parent class if needed
+        self.client = duckdb.connect(f'md:?motherduck_token={MD_TOKEN}')
+        
+    def _execute_query(self, query: str) -> pd.DataFrame:
+        result = self.client.execute(query).fetchall()
+        df = pd.DataFrame(result)
+        return df
+
+    def _get_table_name(self, table_name: str) -> str:
+        return table_name
+
 if __name__ == '__main__':
     bq_client = BigQueryClient()
     df = bq_client.get_dataframe('C_protocol_token_tvl', limit=10)

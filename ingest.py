@@ -53,7 +53,7 @@ async def download_protocol_headers():
     return data
 
 def get_all_protocol_slugs():
-    con = duckdb.connect(f'md:?motherduck_token={MD_TOKEN}')
+    con = duckdb.connect(f'md:tvl_all?motherduck_token={MD_TOKEN}')
     query = f"SELECT DISTINCT slug FROM {TABLES['A']}"
     result = con.execute(query).fetchall()
     con.close()
@@ -111,17 +111,17 @@ async def process_single_file(con, json_file_path, parquet_file_path, latest_dat
         os.remove(parquet_file_path)
 
 async def clear_motherduck_table(tables: list):
-    con = duckdb.connect(f'md:?motherduck_token={MD_TOKEN}')
+    con = duckdb.connect(f'md:tvl_all?motherduck_token={MD_TOKEN}')
     for table in tables:
         exists = con.execute(f"SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = '{table}')").fetchone()[0]
         if exists:
             con.execute(f"DELETE FROM {table}")
         
 @task(retries=3, retry_delay_seconds=[1, 10, 100])
-async def upload_df_to_motherduck(file_path, table_name, con = duckdb.connect(f'md:?motherduck_token={MD_TOKEN}')):
+async def upload_df_to_motherduck(file_path, table_name, con = duckdb.connect(f'md:tvl_all?motherduck_token={MD_TOKEN}')):
     """TODO: WRITE WRITE CONFCLIT WHEN TABLE C DOES NOT EXIST. 
     duckdb.duckdb.TransactionException: TransactionContext Error: Catalog write-write conflict on create with "C_protocol_token_tvl"""
-    # con = duckdb.connect(f'md:?motherduck_token={MD_TOKEN}')
+    # con = duckdb.connect(f'md:tvl_all?motherduck_token={MD_TOKEN}')
     # con.execute(f"CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * FROM '{file_path}'")
     con.execute(f"INSERT INTO {table_name} SELECT * FROM '{file_path}'")
     con.close()
@@ -131,7 +131,7 @@ async def download_and_process_single_protocol(slug):
     url = f"{BASE_URL}protocol/{slug}"
     data = fetch_data(url)
     if data:
-        con = duckdb.connect(f'md:?motherduck_token={MD_TOKEN}')
+        con = duckdb.connect(f'md:tvl_all?motherduck_token={MD_TOKEN}')
         unique_id = data['id']
         latest_date_query = f"SELECT MAX(date) FROM {TABLES['C']} WHERE id = '{unique_id}'"
         latest_date_result = con.execute(latest_date_query).fetchone()
@@ -139,7 +139,6 @@ async def download_and_process_single_protocol(slug):
         json_file_path = os.path.join(DATA_DIR, f"{slug}.json")
         parquet_file_path = os.path.join(DATA_DIR, f"{slug}.parquet")
         save_data_to_file(data, json_file_path)
-        
         await process_single_file.fn(con, json_file_path, parquet_file_path, latest_date)
         os.remove(json_file_path)
 
