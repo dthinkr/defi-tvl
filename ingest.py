@@ -4,7 +4,6 @@ import os
 import yaml
 import pickle
 import pandas as pd
-import glob
 from prefect import task, flow, get_run_logger
 from config.config import TABLES, MD_TOKEN
 import duckdb
@@ -102,7 +101,6 @@ def extract_token_tvl(file_path, latest_date=None):
     if df.empty:
         get_run_logger().info(f"No new data found in {file_path}.")
     return df
-
 
 @task
 async def process_single_file(con, json_file_path, parquet_file_path, latest_date=None):

@@ -18,3 +18,5 @@ node_modules/
 yarn-error.log
 
 *.json
+*.duckdb
+*.ipynb

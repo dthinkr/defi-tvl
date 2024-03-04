@@ -1,19 +1,16 @@
-import asyncio
+import dlt
+from dlt.sources.helpers import requests
 
-from prefect import task, flow
-
-@task
-async def print_values(values):
-    for value in values:
-        await asyncio.sleep(1) # yield
-        print(value, end=" ")
-
-@flow
-async def async_flow():
-    await print_values([1, 2])  # runs immediately
-    coros = [print_values("abcd"), print_values("6789")]
-
-    # asynchronously gather the tasks
-    await asyncio.gather(*coros)
-
-asyncio.run(async_flow())
+# Create a dlt pipeline that will load
+# chess player data to the DuckDB destination
+pipeline = dlt.pipeline(
+    pipeline_name="chess_pipeline", destination="duckdb", dataset_name="player_data"
+)
+# Grab some player data from Chess.com API
+data = []
+for player in ["magnuscarlsen", "rpragchess"]:
+    response = requests.get(f"https://api.chess.com/pub/player/{player}")
+    response.raise_for_status()
+    data.append(response.json())
+# Extract, normalize, and load the data
+load_info = pipeline.run(data, table_name="player")
