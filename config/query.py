@@ -1,4 +1,5 @@
 from google.cloud import bigquery, exceptions
+from google.cloud.bigquery import DatasetReference
 from google.cloud.bigquery.table import Table
 from google.cloud.bigquery.client import Client
 from google.cloud.bigquery.dataset import DatasetReference
@@ -23,7 +24,7 @@ class BigQueryClient:
             st.secrets["gcp_service_account"]
         )
         self.client: Client = bigquery.Client(credentials=self.credentials, project=project)
-        self.dataset_ref: DatasetReference = self.client.dataset(dataset)
+        self.dataset_ref: DatasetReference = DatasetReference(project, dataset)
 
     def _execute_query(self, query: str) -> pd.DataFrame:
         try:
