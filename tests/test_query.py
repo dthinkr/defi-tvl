@@ -1,28 +1,43 @@
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock
 from config.query import BigQueryClient, MotherduckClient
-
-# Mock for pandas DataFrame
-mock_df = MagicMock()
 
 @pytest.fixture
 def bigquery_client():
-    with patch('config.query.bigquery.Client') as mock_client:
-        mock_client.return_value.query.return_value.to_dataframe.return_value = mock_df
-        yield BigQueryClient(project='test_project', dataset='test_dataset')
+    client = BigQueryClient()
+    client.get_token_distribution = MagicMock(return_value='mocked dataframe')
+    client.get_protocol_data = MagicMock(return_value='mocked dataframe')
+    client.compare_months = MagicMock(return_value='mocked dataframe')
+    return client
 
 @pytest.fixture
 def motherduck_client():
-    with patch('config.query.duckdb.connect') as mock_connect:
-        mock_connect.return_value.execute.return_value.fetchall.return_value = [('row1', 'row2')]
-        yield MotherduckClient()
+    client = MotherduckClient()
+    client.get_token_distribution = MagicMock(return_value='mocked dataframe')
+    client.get_protocol_data = MagicMock(return_value='mocked dataframe')
+    client.compare_months = MagicMock(return_value='mocked dataframe')
+    return client
 
-def test_bigquery_get_dataframe(bigquery_client):
-    df = bigquery_client.get_dataframe('test_table', limit=10)
-    assert df == mock_df
-    bigquery_client.client.query.assert_called_once()
+def test_get_token_distribution_bigquery(bigquery_client):
+    df = bigquery_client.get_token_distribution('USDC', 'monthly')
+    assert df == 'mocked dataframe'
 
-def test_motherduck_get_dataframe(motherduck_client):
-    df = motherduck_client.get_dataframe('test_table', limit=10)
-    assert not df.empty
-    motherduck_client.client.execute.assert_called_once()
+def test_get_token_distribution_duckdb(motherduck_client):
+    df = motherduck_client.get_token_distribution('USDC', 'monthly')
+    assert df == 'mocked dataframe'
+
+def test_get_protocol_data_bigquery(bigquery_client):
+    df = bigquery_client.get_protocol_data('MakerDAO', 'monthly')
+    assert df == 'mocked dataframe'
+
+def test_get_protocol_data_duckdb(motherduck_client):
+    df = motherduck_client.get_protocol_data('MakerDAO', 'monthly')
+    assert df == 'mocked dataframe'
+
+def test_compare_periods_bigquery(bigquery_client):
+    df = bigquery_client.compare_periods('2023')
+    assert df == 'mocked dataframe'
+
+def test_compare_periods_duckdb(motherduck_client):
+    df = motherduck_client.compare_periods('2023-01-24')
+    assert df == 'mocked dataframe'

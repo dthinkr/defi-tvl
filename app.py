@@ -20,7 +20,7 @@ import subprocess
 import requests
 from datetime import datetime, timedelta
 import socket
-from src.etl_network import ETLNetwork
+from config.etl_network import ETLNetwork
 
 
 def start_uvicorn():

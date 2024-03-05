@@ -14,6 +14,10 @@ import duckdb
 import sys
 import os
 
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
+from dateutil.parser import parse
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config.config import QUERY_DATA_SET, QUERY_PROJECT
 
@@ -255,7 +259,6 @@ class BigQueryClient:
         return self._execute_query(query)
 
 
-
 class MotherduckClient(BigQueryClient):
     def __init__(self) -> None:
         super().__init__()  # Initialize parent class if needed
@@ -288,64 +291,67 @@ class MotherduckClient(BigQueryClient):
             return "DATE_TRUNC('year', TIMESTAMP 'epoch' + C.date * INTERVAL '1 second')"
         else:
             raise ValueError(f"Unsupported granularity: {granularity}")
+        
 
-    def compare_months(self, year1: int, month1: int, year2: int, month2: int, table: str = TABLES['C']) -> pd.DataFrame:
-        """Compare monthly aggregated data between two months."""
-        query = f"""WITH month1_data AS (
-                SELECT
-                    id,
-                    chain_name,
-                    token_name,
-                    DATE_TRUNC('month', TIMESTAMP 'epoch' + date * INTERVAL '1 second') AS year_month,
-                    AVG(quantity) AS qty_m1_avg,
-                    AVG(value_usd) AS usd_m1_avg
-                FROM
-                    {self._get_table_name(table)}
-                WHERE
-                    EXTRACT(YEAR FROM TIMESTAMP 'epoch' + date * INTERVAL '1 second') = {year1} AND
-                    EXTRACT(MONTH FROM TIMESTAMP 'epoch' + date * INTERVAL '1 second') = {month1}
-                GROUP BY
-                    id, chain_name, token_name, year_month
-            ),
-            month2_data AS (
-                SELECT
-                    id,
-                    chain_name,
-                    token_name,
-                    DATE_TRUNC('month', TIMESTAMP 'epoch' + date * INTERVAL '1 second') AS year_month,
-                    AVG(quantity) AS qty_m2_avg,
-                    AVG(value_usd) AS usd_m2_avg
-                FROM
-                    {self._get_table_name(table)}
-                WHERE
-                    EXTRACT(YEAR FROM TIMESTAMP 'epoch' + date * INTERVAL '1 second') = {year2} AND
-                    EXTRACT(MONTH FROM TIMESTAMP 'epoch' + date * INTERVAL '1 second') = {month2}
-                GROUP BY
-                    id, chain_name, token_name, year_month
-            )
+    def compare_periods(self, input_date: str, granularity: str) -> pd.DataFrame:
+        parsed_date = parse(input_date)
+        
+        # Calculate start and end dates based on granularity
+        if granularity == 'yearly':
+            start_date = datetime(parsed_date.year, 1, 1)
+            end_date = start_date + relativedelta(years=1)
+        elif granularity == 'monthly':
+            start_date = datetime(parsed_date.year, parsed_date.month, 1)
+            end_date = start_date + relativedelta(months=1)
+        elif granularity == 'daily':
+            start_date = datetime(parsed_date.year, parsed_date.month, parsed_date.day)
+            end_date = start_date + relativedelta(days=1)
+        else:
+            raise ValueError(f"Unsupported granularity: {granularity}")
+        
+        # Convert dates to Unix timestamp for comparison
+        start_timestamp = int(start_date.timestamp())
+        end_timestamp = int(end_date.timestamp())
+        
+        # Adjusting date_trunc_expr for DuckDB and Unix timestamp
+        date_trunc_expr = self._get_date_trunc_expr(granularity).replace("C.date", "date")
+        
+        table_name = self._get_table_name(TABLES['C'])  # Ensure this returns the correct table name
+        
+        # Adjusted query for Unix timestamp and correct period comparison
+        query = f"""
+        WITH period_data AS (
             SELECT
-                m1.id,
-                m1.chain_name,
-                m1.token_name,
-                m1.year_month AS month1,
-                m2.year_month AS month2,
-                m1.qty_m1_avg,
-                m2.qty_m2_avg,
-                m1.usd_m1_avg,
-                m2.usd_m2_avg,
-                m2.qty_m2_avg - m1.qty_m1_avg AS qty_change,
-                m2.usd_m2_avg - m1.usd_m1_avg AS usd_change
+                id,
+                chain_name,
+                token_name,
+                {date_trunc_expr} AS period,
+                AVG(quantity) AS avg_quantity,
+                AVG(value_usd) AS avg_value_usd
             FROM
-                month1_data m1
-            FULL OUTER JOIN
-                month2_data m2 ON m1.id = m2.id AND m1.chain_name = m2.chain_name AND m1.token_name = m2.token_name
+                {table_name}
             WHERE
-                m2.qty_m2_avg - m1.qty_m1_avg != 0 OR
-                m2.usd_m2_avg - m1.usd_m1_avg != 0"""
+                date >= {start_timestamp} AND
+                date < {end_timestamp}
+            GROUP BY
+                id, chain_name, token_name, period
+        )
+        SELECT
+            id,
+            chain_name,
+            token_name,
+            MIN(period) AS start_period,
+            MAX(period) AS end_period,
+            AVG(avg_quantity) OVER(PARTITION BY id, chain_name, token_name ORDER BY period) AS avg_quantity,
+            AVG(avg_value_usd) OVER(PARTITION BY id, chain_name, token_name ORDER BY period) AS avg_value_usd,
+            LAG(avg_quantity, 1) OVER(PARTITION BY id, chain_name, token_name ORDER BY period) AS prev_avg_quantity,
+            LAG(avg_value_usd, 1) OVER(PARTITION BY id, chain_name, token_name ORDER BY period) AS prev_avg_value_usd
+        FROM period_data
+        """
         
         return self._execute_query(query)
     
-    def _get_aggregated_data(self, table_name: str, token_name: str = None, protocol_name: str = None, granularity: str) -> str:
+    def _get_aggregated_data(self, table_name: str, granularity: str, token_name: str = None, protocol_name: str = None) -> str:
         """
         Returns a SQL query for retrieving aggregated data with averages over a specified period.
         
@@ -412,10 +418,10 @@ class MotherduckClient(BigQueryClient):
     
     def get_token_distribution(self, token_name: str, granularity: str) -> pd.DataFrame:
         """Retrieve the distribution of a specific token across protocols over time at specified granularity."""
-        query = self._get_aggregated_data(TABLES['C'], token_name=token_name, granularity=granularity)
+        query = self._get_aggregated_data(TABLES['C'], granularity=granularity, token_name=token_name)
         return self._execute_query(query)
 
     def get_protocol_data(self, protocol_name: str, granularity: str) -> pd.DataFrame:
         """Retrieve data for a specific protocol with granularity, calculating the average of sums."""
-        query = self._get_aggregated_data(TABLES['C'], protocol_name=protocol_name, granularity=granularity)
+        query = self._get_aggregated_data(TABLES['C'], granularity=granularity, protocol_name=protocol_name)
         return self._execute_query(query)
