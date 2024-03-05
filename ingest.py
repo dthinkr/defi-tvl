@@ -5,7 +5,7 @@ import yaml
 import pickle
 import pandas as pd
 from prefect import task, flow, get_run_logger
-from config.config import TABLES, MD_TOKEN
+from config.config import TABLES, MD_TOKEN, CATEGORY_MAPPING
 import duckdb
 import asyncio
 import psutil
@@ -44,16 +44,38 @@ async def download_protocol_headers():
         df = pd.DataFrame(data)
         for col in df.select_dtypes(include=['object']).columns:
             df[col] = df[col].astype(str)
+        df['type'] = 'default'
         df.to_parquet(PROTOCOL_HEADERS_PARQUET, index=False)
         await upload_df_to_motherduck.fn(PROTOCOL_HEADERS_PARQUET, TABLES['A'])
+        await add_type_column.fn()
         os.remove(PROTOCOL_HEADERS_FILE)
         os.remove(PROTOCOL_HEADERS_PARQUET)
     else: 
         get_run_logger().info("No data found in the API response.")
     return data
 
+@task
+async def add_type_column():
+    con = duckdb.connect(f'md:?motherduck_token={MD_TOKEN}')
+    con.execute(f"ALTER TABLE {TABLES['A']} ADD COLUMN IF NOT EXISTS type VARCHAR;")
+
+    category_to_type = {}
+    for type_name, categories in CATEGORY_MAPPING.items():
+        for category in categories:
+            category_to_type[category] = type_name
+    
+    for category, type_name in category_to_type.items():
+        update_query = f"""
+        UPDATE {TABLES['A']}
+        SET type = '{type_name}'
+        WHERE category = '{category}';
+        """
+        con.execute(update_query)
+    
+    con.close()
+
 def get_all_protocol_slugs():
-    con = duckdb.connect(f'md:tvl_all?motherduck_token={MD_TOKEN}')
+    con = duckdb.connect(f'md:?motherduck_token={MD_TOKEN}')
     query = f"SELECT DISTINCT slug FROM {TABLES['A']}"
     result = con.execute(query).fetchall()
     con.close()
@@ -111,17 +133,17 @@ async def process_single_file(con, json_file_path, parquet_file_path, latest_dat
         os.remove(parquet_file_path)
 
 async def clear_motherduck_table(tables: list):
-    con = duckdb.connect(f'md:tvl_all?motherduck_token={MD_TOKEN}')
+    con = duckdb.connect(f'md:?motherduck_token={MD_TOKEN}')
     for table in tables:
         exists = con.execute(f"SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = '{table}')").fetchone()[0]
         if exists:
             con.execute(f"DELETE FROM {table}")
         
 @task(retries=3, retry_delay_seconds=[1, 10, 100])
-async def upload_df_to_motherduck(file_path, table_name, con = duckdb.connect(f'md:tvl_all?motherduck_token={MD_TOKEN}')):
+async def upload_df_to_motherduck(file_path, table_name, con = duckdb.connect(f'md:?motherduck_token={MD_TOKEN}')):
     """TODO: WRITE WRITE CONFCLIT WHEN TABLE C DOES NOT EXIST. 
     duckdb.duckdb.TransactionException: TransactionContext Error: Catalog write-write conflict on create with "C_protocol_token_tvl"""
-    # con = duckdb.connect(f'md:tvl_all?motherduck_token={MD_TOKEN}')
+    # con = duckdb.connect(f'md:?motherduck_token={MD_TOKEN}')
     # con.execute(f"CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * FROM '{file_path}'")
     con.execute(f"INSERT INTO {table_name} SELECT * FROM '{file_path}'")
     con.close()
@@ -131,7 +153,7 @@ async def download_and_process_single_protocol(slug):
     url = f"{BASE_URL}protocol/{slug}"
     data = fetch_data(url)
     if data:
-        con = duckdb.connect(f'md:tvl_all?motherduck_token={MD_TOKEN}')
+        con = duckdb.connect(f'md:?motherduck_token={MD_TOKEN}')
         unique_id = data['id']
         latest_date_query = f"SELECT MAX(date) FROM {TABLES['C']} WHERE id = '{unique_id}'"
         latest_date_result = con.execute(latest_date_query).fetchone()

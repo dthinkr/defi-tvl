@@ -9,7 +9,7 @@ import numpy as np
 import os
 
 class ETLNetwork:
-    def __init__(self, bq: BigQueryClient):
+    def __init__(self, bq):
         self.bq = bq
         self.mapping_path = MAPPING_PATH
         self.rev_map, self.categories, self.id_to_info = {}, {}, {}
@@ -89,7 +89,6 @@ class ETLNetwork:
                 matched_id = A.iloc[best_match_index]['id']
                 matched_name = A.iloc[best_match_index]['name']
                 token_to_protocol[token_name] = {'id': matched_id, 'name': matched_name}
-
 
         return token_to_protocol
     

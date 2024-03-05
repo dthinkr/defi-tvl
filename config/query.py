@@ -17,7 +17,6 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config.config import QUERY_DATA_SET, QUERY_PROJECT
 
-
 class BigQueryClient:
     def __init__(self, project: str = QUERY_PROJECT, dataset: str = QUERY_DATA_SET) -> None:
         self.credentials: Credentials = service_account.Credentials.from_service_account_info(
@@ -83,10 +82,8 @@ class BigQueryClient:
     def get_token_distribution(self, token_name: str, granularity: str) -> pd.DataFrame:
         """Retrieve the distribution of a specific token across protocols over time at specified granularity."""
 
-        # Get the date truncation expression based on the granularity
         date_trunc_expr = self._get_date_trunc_expr(granularity)
 
-        # Construct the SQL query with aggregation
         query = f"""
         SELECT 
             {date_trunc_expr} as aggregated_date,
@@ -265,13 +262,160 @@ class MotherduckClient(BigQueryClient):
         self.client = duckdb.connect(f'md:?motherduck_token={MD_TOKEN}')
         
     def _execute_query(self, query: str) -> pd.DataFrame:
-        result = self.client.execute(query).fetchall()
-        df = pd.DataFrame(result)
-        return df
+        result = self.client.execute(query).df()
+        return result
 
     def _get_table_name(self, table_name: str) -> str:
         return table_name
+    
+    def _get_date_trunc_expr(self, granularity: str) -> str:
+        """
+        Returns the appropriate date truncation expression for DuckDB based on the specified granularity.
 
-if __name__ == '__main__':
-    bq_client = BigQueryClient()
-    df = bq_client.get_dataframe('C_protocol_token_tvl', limit=10)
+        Parameters:
+        - granularity (str): The granularity for date truncation, e.g., 'daily', 'weekly', 'monthly'.
+
+        Returns:
+        - str: A DuckDB-compatible SQL expression for date truncation.
+        """
+        if granularity == 'daily':
+            return "DATE_TRUNC('day', TIMESTAMP 'epoch' + C.date * INTERVAL '1 second')"
+        elif granularity == 'weekly':
+            return "DATE_TRUNC('week', TIMESTAMP 'epoch' + C.date * INTERVAL '1 second')"
+        elif granularity == 'monthly':
+            return "DATE_TRUNC('month', TIMESTAMP 'epoch' + C.date * INTERVAL '1 second')"
+        elif granularity == 'yearly':
+            return "DATE_TRUNC('year', TIMESTAMP 'epoch' + C.date * INTERVAL '1 second')"
+        else:
+            raise ValueError(f"Unsupported granularity: {granularity}")
+
+    def compare_months(self, year1: int, month1: int, year2: int, month2: int, table: str = TABLES['C']) -> pd.DataFrame:
+        """Compare monthly aggregated data between two months."""
+        query = f"""WITH month1_data AS (
+                SELECT
+                    id,
+                    chain_name,
+                    token_name,
+                    DATE_TRUNC('month', TIMESTAMP 'epoch' + date * INTERVAL '1 second') AS year_month,
+                    AVG(quantity) AS qty_m1_avg,
+                    AVG(value_usd) AS usd_m1_avg
+                FROM
+                    {self._get_table_name(table)}
+                WHERE
+                    EXTRACT(YEAR FROM TIMESTAMP 'epoch' + date * INTERVAL '1 second') = {year1} AND
+                    EXTRACT(MONTH FROM TIMESTAMP 'epoch' + date * INTERVAL '1 second') = {month1}
+                GROUP BY
+                    id, chain_name, token_name, year_month
+            ),
+            month2_data AS (
+                SELECT
+                    id,
+                    chain_name,
+                    token_name,
+                    DATE_TRUNC('month', TIMESTAMP 'epoch' + date * INTERVAL '1 second') AS year_month,
+                    AVG(quantity) AS qty_m2_avg,
+                    AVG(value_usd) AS usd_m2_avg
+                FROM
+                    {self._get_table_name(table)}
+                WHERE
+                    EXTRACT(YEAR FROM TIMESTAMP 'epoch' + date * INTERVAL '1 second') = {year2} AND
+                    EXTRACT(MONTH FROM TIMESTAMP 'epoch' + date * INTERVAL '1 second') = {month2}
+                GROUP BY
+                    id, chain_name, token_name, year_month
+            )
+            SELECT
+                m1.id,
+                m1.chain_name,
+                m1.token_name,
+                m1.year_month AS month1,
+                m2.year_month AS month2,
+                m1.qty_m1_avg,
+                m2.qty_m2_avg,
+                m1.usd_m1_avg,
+                m2.usd_m2_avg,
+                m2.qty_m2_avg - m1.qty_m1_avg AS qty_change,
+                m2.usd_m2_avg - m1.usd_m1_avg AS usd_change
+            FROM
+                month1_data m1
+            FULL OUTER JOIN
+                month2_data m2 ON m1.id = m2.id AND m1.chain_name = m2.chain_name AND m1.token_name = m2.token_name
+            WHERE
+                m2.qty_m2_avg - m1.qty_m1_avg != 0 OR
+                m2.usd_m2_avg - m1.usd_m1_avg != 0"""
+        
+        return self._execute_query(query)
+    
+    def _get_aggregated_data(self, table_name: str, token_name: str = None, protocol_name: str = None, granularity: str) -> str:
+        """
+        Returns a SQL query for retrieving aggregated data with averages over a specified period.
+        
+        Parameters:
+        - table_name (str): The name of the table to query.
+        - token_name (str): Optional. The name of the token to filter by.
+        - protocol_name (str): Optional. The name of the protocol to filter by.
+        - granularity (str): The granularity for date truncation, e.g., 'daily', 'weekly', 'monthly'.
+        
+        Returns:
+        - str: A SQL query string.
+        """
+        date_trunc_expr = self._get_date_trunc_expr(granularity)
+        token_filter = f"AND C.token_name = '{token_name}'" if token_name else ""
+        protocol_filter = f"AND A.name = '{protocol_name}'" if protocol_name else ""
+
+        query = f"""
+        WITH AggregatedData AS (
+            SELECT
+                {date_trunc_expr} as aggregated_date,
+                C.id as id,
+                A.name as protocol_name,
+                A.category as category,
+                A.type as type,
+                C.chain_name,
+                C.token_name,
+                SUM(C.quantity) as sum_quantity,
+                SUM(C.value_usd) as sum_value_usd
+            FROM 
+                {self._get_table_name(table_name)} C
+            INNER JOIN 
+                {self._get_table_name(TABLES['A'])} A ON C.id = A.id
+            WHERE 
+                C.quantity > 0 AND
+                C.value_usd > 0
+                {token_filter}
+                {protocol_filter}
+            GROUP BY 
+                aggregated_date, C.id, A.name, A.category, A.type, C.chain_name, C.token_name
+        )
+        SELECT
+            aggregated_date,
+            id,
+            protocol_name,
+            category,
+            type,
+            chain_name,
+            token_name,
+            AVG(sum_quantity) as avg_total_quantity,
+            AVG(sum_value_usd) as avg_total_value_usd
+        FROM AggregatedData
+        GROUP BY
+            aggregated_date,
+            id,
+            protocol_name,
+            category,
+            type,
+            chain_name,
+            token_name
+        ORDER BY 
+            aggregated_date, id
+        """
+        return query
+    
+    def get_token_distribution(self, token_name: str, granularity: str) -> pd.DataFrame:
+        """Retrieve the distribution of a specific token across protocols over time at specified granularity."""
+        query = self._get_aggregated_data(TABLES['C'], token_name=token_name, granularity=granularity)
+        return self._execute_query(query)
+
+    def get_protocol_data(self, protocol_name: str, granularity: str) -> pd.DataFrame:
+        """Retrieve data for a specific protocol with granularity, calculating the average of sums."""
+        query = self._get_aggregated_data(TABLES['C'], protocol_name=protocol_name, granularity=granularity)
+        return self._execute_query(query)

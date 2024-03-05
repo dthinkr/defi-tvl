@@ -1,12 +1,12 @@
 from fastapi import FastAPI, HTTPException, Query, Path
 from src.etl_network import ETLNetwork
-from config.query import BigQueryClient 
+from config.query import BigQueryClient, MotherduckClient
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 
 app = FastAPI()
 
-bq = BigQueryClient()
+bq = MotherduckClient()
 etl_network = ETLNetwork(bq=bq)
 
 @app.get("/network-json/{year_month}", summary="Retrieve Network Data",

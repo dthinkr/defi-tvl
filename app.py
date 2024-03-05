@@ -12,7 +12,7 @@ import numpy as np
 import itertools
 
 from config.config import CUSTOM_COLORS, TOP_N, original_names, abbreviated_names, TABLES, NETWORK_PRELIMINARIES
-from config.query import BigQueryClient
+from config.query import BigQueryClient, MotherduckClient
 from config.chord import ChordDiagramData
 from config.plot_network import NetworkVisualizer
 
@@ -24,7 +24,7 @@ from src.etl_network import ETLNetwork
 
 
 def start_uvicorn():
-    uvicorn_command = "uvicorn endpoint:app --host 0.0.0.0 --port 8000"
+    uvicorn_command = "python -m uvicorn endpoint:app --host 0.0.0.0 --port 8000"
     subprocess.Popen(uvicorn_command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 
@@ -180,7 +180,7 @@ def main():
     # visualizer.plot_yearly_distribution()
     # st.pyplot(plt)
 
-    bq = BigQueryClient()
+    bq = MotherduckClient()
 
     tab1, tab2, tab3 = st.tabs(['Token Analysis', 'Chord Diagram', 'Network Diagram'])
 
