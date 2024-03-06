@@ -5,10 +5,10 @@ from endpoint import app
 
 client = TestClient(app)
 
-@patch('endpoint.bq.compare_months', return_value='mocked dataframe')
+@patch('endpoint.bq.compare_periods', return_value='mocked dataframe')
 @patch('endpoint.etl_network.process_dataframe', return_value={'data': 'processed'})
-def test_get_network_json(mock_compare_months, mock_process_dataframe):
-    response = client.get("/network-json/2023-01?TOP_X=10&mode=usd")
+def test_get_network_json(mock_compare_periods, mock_process_dataframe):
+    response = client.get("/network-json/2023-01-01?TOP_X=10&daily&mode=usd")
     assert response.status_code == 200
     assert response.json() == {'data': 'processed'}
 

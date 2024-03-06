@@ -36,8 +36,8 @@ def is_uvicorn_running():
     return is_port_in_use(8000)
 
 @st.cache_data
-def get_network_data(year_month, TOP_X=50, mode='usd'):
-    url = f"http://127.0.0.1:8000/network-json/{year_month}?TOP_X={TOP_X}&mode={mode}"
+def get_network_data(year_month, TOP_X=50, granularity='daily', mode='usd'):
+    url = f"http://127.0.0.1:8000/network-json/{year_month}?TOP_X={TOP_X}&granularity={granularity}&mode={mode}"
     response = requests.get(url)
     if response.status_code == 200:
         return response.json()
@@ -147,206 +147,77 @@ def retrieve_table_A(_bq: BigQueryClient):
     return _bq.get_dataframe(TABLES['A'])
 
 @st.cache_data
-def table_C_compare_months(_bq: BigQueryClient, year1, month1, year2, month2):
-    C = _bq.compare_months(year1, month1, year2, month2)
+def table_C_compare_periods(_bq: BigQueryClient, year1, month1, year2, month2):
+    C = _bq.compare_periods(year1, month1, year2, month2)
     return C
 
 def main():
     """Execute the Streamlit app."""
     st.title("dFMI TVL Demo")
 
-    # # Plotting section
-    # st.write("# Token Distribution Visualization")
-
-    # # Create an instance of the visualization class
-    # visualizer = TokenDistributionVisualizer('data/tvl/aave_agg.csv', 'tab10')
-
-    # # Calculate Gini coefficients
-    # visualizer.calculate_gini_coefficients()
-
-    # # Display Gini Coefficient Plot
-    # st.write("## Gini Coefficient Over Time")
-    # visualizer.plot_gini_coefficients()
-    # st.pyplot(plt)
-
-    # # Display Staked Tokens Plot
-    # st.write("## Staked Tokens Over Time")
-    # visualizer.aggregate_top_addresses()
-    # visualizer.plot_staked_tokens()
-    # st.pyplot(plt)
-
-    # # Display Yearly Distribution Plot
-    # st.write("## Yearly Token Distribution")
-    # visualizer.plot_yearly_distribution()
-    # st.pyplot(plt)
-
-    bq = MotherduckClient()
-
-    tab1, tab2, tab3 = st.tabs(['Token Analysis', 'Chord Diagram', 'Network Diagram'])
-
     if not is_uvicorn_running():
         start_uvicorn()
 
-    with tab1: 
+    st.write("# Network Diagram")
+    st.write("This shows the global monthly token locked changes across all DeFi protocols")
+
+    # Define the range of months for the slider
+
+    # User selects the granularity
+    granularity_options = ['daily', 'monthly', 'yearly']
+    granularity = st.selectbox("Select the granularity:", options=granularity_options, index=0)
+    # Define the start and end dates
+    start_date = datetime(2020, 1, 1)
+    end_date = datetime.now()
+
+    # Generate date range based on selected granularity
+    if granularity == 'daily':
+        freq = 'D'
+    elif granularity == 'monthly':
+        freq = 'MS'  # Month start frequency
+    elif granularity == 'yearly':
+        freq = 'YS'  # Year start frequency
+
+    date_range = pd.date_range(start_date, end_date, freq=freq)
+
+    # Convert date_range to list of strings for display
+    if granularity == 'yearly':
+        options = [date.strftime("%Y") for date in date_range]
+    else:
+        options = [date.strftime("%Y-%m-%d") if granularity == 'daily' else date.strftime("%Y-%m") for date in date_range]
+
+    # Create a slider for date selection
+    selected_date = st.select_slider(f"Select {granularity.capitalize()}:", options=options, value=options[-1])
+
+    top_x = st.number_input("Select the number of nodes shown, the rest are aggregated:", min_value=1, max_value=500, value=30, step=10)
+    mode_options = ['usd', 'qty']
+    selected_mode = st.selectbox("Display token amount or token USD value:", options=mode_options, index=0)  # Default to 'usd'
+    
+
+    # Fetch the network data for the selected month
+    network_data = get_network_data(selected_date, TOP_X=top_x, granularity = granularity, mode=selected_mode)
+    # unique_ids = len(set(item['id'] for item in network_data['nodes']))
+    # total_size = sum(item['size'] for item in network_data['nodes'])
+
+    # if total_size >= 1e9:
+    #     size_in_b_or_m = f"{int(total_size / 1e9)} billion"
+    # elif total_size >= 1e6:
+    #     size_in_b_or_m = f"{int(total_size / 1e6)} million"
+    # else:
+    #     size_in_b_or_m = f"{int(total_size)}"  # Less than a million, keep as is
+
+    
+    # st.write('## Network Summary')
+    # st.write(f'Total nodes: {unique_ids}, Total size: {size_in_b_or_m} USD')
 
 
-        st.write("# Token Analysis")
+    st.write('## Network Visualization')
+    if network_data:
+        # Display the network visualization
+        html_content = display_network(network_data)
+        st.components.v1.html(html_content, height=750, scrolling=True)
 
-        granularity = st.selectbox("Select data granularity:", options=['daily', 'weekly', 'monthly'], index=2)  # default to 'weekly'
-
-        # User input for selecting a token
-        token_name = st.text_input("Enter the token name for analysis (e.g., DAI):", 'USDC')
-        
-        if token_name:
-            # Fetch data for the specified token name with the user-defined percentage and granularity
-            token_distribution_df, table_a_df = load_token_distribution(bq, token_name, granularity)
-
-            token_distribution_df['aggregated_date'] = pd.to_datetime(token_distribution_df['aggregated_date'])
-            token_distribution_df['aggregated_date'] = token_distribution_df['aggregated_date'].dt.strftime('%Y-%m-%d')
-
-            # token_distribution_df.to_csv(f'distribution {token_name}.csv', index=False)
-
-            # Convert DataFrame to JSON-serializable format (list of dictionaries)
-            data_for_observable = token_distribution_df.to_dict(orient='records')
-
-            st.write(f'## Where is {token_name} locked?')
-            # st.write('### Tree map')
-            # st.write('Moved to design improvements')
-            # # Pass this data to the Observable component
-            # # observable("Tree", 
-            # #         notebook="@venvox-ws/defi-tvl-data-loading", 
-            # #         targets=["area"],
-            # #         redefine={"data": data_for_observable,})
-            
-            extracted_df = token_distribution_df[['aggregated_date', 'protocol_name', 'type', 'total_value_usd']].copy()
-            extracted_df.columns = ['date', 'name', 'category', 'value']  # This is usually fine as it's a direct operation on the DataFrame.
-            extracted_df['value'] = extracted_df['value'] / 1e6
-            extracted_df['value'] = extracted_df['value'].astype(int)
-            extracted_df['date'] = pd.to_datetime(extracted_df['date'])
-            extracted_df = extracted_df[extracted_df['date'] >= pd.to_datetime('2021-01-01')]
-            
-            # Adjust all dates to the first day of their respective months
-            extracted_df['date'] = extracted_df['date'].apply(lambda x: x.replace(day=1))
-
-            extracted_df = extracted_df.groupby(['date', 'name', 'category'], as_index=False).sum()
-
-            # Convert 'date' back to string
-            extracted_df['date'] = extracted_df['date'].dt.strftime('%Y-%m-%d')
-
-            # Convert the DataFrame to a dictionary
-            extracted_df = extracted_df.to_dict(orient='records')
-
-            # st.write('### Bar Chart Race')
-
-            # # Pass this data to the Observable component
-            # observable("Race", 
-            #         notebook="@venvox-ws/bar-chart-race", 
-            #         targets=["chart"],
-            #         redefine={"data2": extracted_df,})
-            
-            st.write('### Time Series')
-            
-            # Dropdown for the user to select the aggregation attribute based on table A columns
-            if table_a_df is not None and not table_a_df.empty:
-                aggregation_attribute = st.selectbox("Select an attribute from Table A for grouping:", 
-                                                    options=table_a_df.columns.tolist(), 
-                                                    index=table_a_df.columns.tolist().index('type') 
-                                                    if 'category' in table_a_df.columns.tolist() else 0)
-
-                # Merge the two dataframes on the common 'id', adding suffixes to distinguish columns with the same name
-                merged_df = pd.merge(token_distribution_df, table_a_df[['id', aggregation_attribute]], on='id', suffixes=('_token', '_a'))
-
-                # Handle renamed columns if 'aggregation_attribute' exists in both DataFrames
-                if aggregation_attribute in token_distribution_df.columns:
-                    aggregation_attribute += '_a'  # Use the suffix to refer to the column from table_a_df
-
-                # Group by the selected attribute and date, and then sum up the total value
-                merged_agg = merged_df.groupby([aggregation_attribute, 'aggregated_date']).sum(numeric_only=True).reset_index()
-
-                st.write(f"#### Where is {token_name} locked? Aggregated by {aggregation_attribute}")
-                ts_chart_a = plot_time_series(merged_agg, 'aggregated_date:T', 'total_value_usd:Q', f'{aggregation_attribute}:N')
-                st.altair_chart(ts_chart_a, use_container_width=True)
-
-            else:
-                st.write("No data available for the specified token.")
-
-        st.write("# Protocol Analysis")
-        # User input for selecting a protocol
-        protocol_name = st.text_input("Enter the protocol name for analysis:", 'MakerDAO')
-
-        if protocol_name:
-            # Fetch data for the specified protocol using the cached function
-            protocol_data_df = load_protocol_data(bq, protocol_name, granularity)
-
-            if protocol_data_df is not None and not protocol_data_df.empty:
-                # Code to process and plot the data
-                st.write(f"#### Token Distribution in {protocol_name} Protocol")
-                ts_chart = plot_time_series(protocol_data_df, 'aggregated_date:T', 'total_value_usd:Q', 'token_name:N')
-                st.altair_chart(ts_chart, use_container_width=True)
-            else:
-                st.write("No data available for the specified protocol.")
-
-    with tab2: 
-        st.write("# Chord Diagram: Inter-Protocol Locked Values")
-        st.write("## Temp Removed, Improving Performance")
-        # chord_data, unique_dates_reversed, day_data = get_chord_and_day_data('data/tvl/db/tb.parquet')
-        
-        # # Dropdown to select a specific date, defaulting to the first (latest) date
-        # selected_date = st.selectbox("Select a date:", options=unique_dates_reversed, index=0)
-
-        # # If selected date is not the latest, get data for the selected date
-        # if selected_date != unique_dates_reversed[0]:
-        #     day_data = chord_data.get_data_for_day(selected_date)
-
-        # day_data["names"] = abbreviated_names
-        # observable("Chord", 
-        #         notebook="@venvox-ws/chord-diagram", 
-        #         targets=["chart"],
-        #         redefine={"data": day_data})
-
-    with tab3:
-        st.write("# Network Diagram")
-        st.write("This shows the global monthly token locked changes across all DeFi protocols")
-
-        # Define the range of months for the slider
-        start_date = datetime(2020, 1, 1)
-        end_date = datetime.now()
-        date_range = pd.date_range(start_date, end_date, freq='MS')  # 'MS' means month start frequency
-
-        # Convert date_range to list of strings for display
-        options = [date.strftime("%Y-%m") for date in date_range]
-        
-        # Create a slider for month selection
-        selected_month = st.select_slider("Select Month:", options=options, value=options[20])
-        
-        top_x = st.number_input("Select the number of nodes shown, the rest are aggregated:", min_value=1, max_value=500, value=500, step=10)
-        mode_options = ['usd', 'qty']
-        selected_mode = st.selectbox("Display token amount or token USD value:", options=mode_options, index=0)  # Default to 'usd'
-
-        # Fetch the network data for the selected month
-        network_data = get_network_data(selected_month, TOP_X=top_x, mode=selected_mode)
-        # unique_ids = len(set(item['id'] for item in network_data['nodes']))
-        # total_size = sum(item['size'] for item in network_data['nodes'])
-
-        # if total_size >= 1e9:
-        #     size_in_b_or_m = f"{int(total_size / 1e9)} billion"
-        # elif total_size >= 1e6:
-        #     size_in_b_or_m = f"{int(total_size / 1e6)} million"
-        # else:
-        #     size_in_b_or_m = f"{int(total_size)}"  # Less than a million, keep as is
-
-        
-        # st.write('## Network Summary')
-        # st.write(f'Total nodes: {unique_ids}, Total size: {size_in_b_or_m} USD')
-
-
-        st.write('## Network Visualization')
-        if network_data:
-            # Display the network visualization
-            html_content = display_network(network_data)
-            st.components.v1.html(html_content, height=750, scrolling=True)
-
-        st.write(NETWORK_PRELIMINARIES)
+    st.write(NETWORK_PRELIMINARIES)
 
 if __name__ == "__main__":
     main()

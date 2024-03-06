@@ -1,4 +1,3 @@
-from config.query import BigQueryClient
 from config.config import TABLES, PRIMARY_TOKEN_TO_PROTOCOL, CATEGORY_MAPPING, MAPPING_PATH, SIMILARIY_THRESHOLD
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -110,7 +109,8 @@ class ETLNetwork:
         """
         print("Updating mapping...")
         A = self.bq.get_dataframe(TABLES['A'])
-        A['totalTvls'] = A['currentChainTvls'].apply(lambda x: sum(ast.literal_eval(x).values()) if isinstance(x, str) and x.strip() != '' else 0)
+        tvl_column = 'currentChainTvls' if 'currentChainTvls' in A.columns else 'chainTvls'
+        A['totalTvls'] = A[tvl_column].apply(lambda x: sum(ast.literal_eval(x).values()) if isinstance(x, str) and x.strip() != '' else 0)
         A = A.sort_values(by='totalTvls', ascending=False)
 
         # Update Rev Map
@@ -123,7 +123,6 @@ class ETLNetwork:
         
         self._save_json(rev_map, 'rev_map.json')
         
-        # Update Categories
         unique_token_names = self.bq.get_unique_token_names(TABLES['C']).dropna()
         frequency_df = self.bq.get_token_frequency(TABLES['C'])
         frequency_dict = frequency_df.set_index('token_name')['frequency'].to_dict()
@@ -193,7 +192,7 @@ class ETLNetwork:
 
         self._save_json(id_to_info, 'id_to_info.json')
 
-    def process_dataframe(self, C: pd.DataFrame, TOP_X: int = 50, mode: str = 'usd'):
+    def process_dataframe(self, C: pd.DataFrame, TOP_X: int = 50, mode: str = 'usd', type: str = None):
         """
         Processes a DataFrame to map tokens to protocols, adjust transaction flows, and prepare the data for visualization.
 
@@ -215,10 +214,10 @@ class ETLNetwork:
         C['qty_from'] = C['qty_to'] = C['usd_from'] = C['usd_to'] = None
 
         # For rows where 'usd_change' is negative, it means the flow is from 'from_node' to 'to_node'
-        C.loc[C['usd_change'] < 0, ['qty_from', 'usd_from']] = C.loc[C['usd_change'] < 0, ['qty_m1_avg', 'usd_m1_avg']].values
+        C.loc[C['usd_change'] < 0, ['qty_from', 'usd_from']] = C.loc[C['usd_change'] < 0, ['qty', 'usd']].values
 
         # For rows where 'usd_change' is positive, it means the flow is from 'to_node' to 'from_node'
-        C.loc[C['usd_change'] >= 0, ['qty_to', 'usd_to']] = C.loc[C['usd_change'] >= 0, ['qty_m1_avg', 'usd_m1_avg']].values
+        C.loc[C['usd_change'] >= 0, ['qty_to', 'usd_to']] = C.loc[C['usd_change'] >= 0, ['qty', 'usd']].values
 
         # Function to find the token_id from self.categories
         def find_token_id(token_name):

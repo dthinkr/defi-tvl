@@ -9,7 +9,8 @@ from config.config import TABLES, MD_TOKEN, CATEGORY_MAPPING
 import duckdb
 import asyncio
 import psutil
-from datetime import datetime
+from config.etl_network import ETLNetwork
+from config.query import MotherduckClient
 
 def load_config():
     with open("config.yaml", "r") as file:
@@ -164,6 +165,12 @@ async def download_and_process_single_protocol(slug):
         await process_single_file.fn(con, json_file_path, parquet_file_path, latest_date)
         os.remove(json_file_path)
 
+@task
+async def update_mapping():
+    bq = MotherduckClient()
+    etl = ETLNetwork(bq=bq)
+    etl.update_mapping()
+
 def _get_system_memory_info_gb():
     mem = psutil.virtual_memory()
     return mem.total / (1024.0 ** 3)
@@ -188,6 +195,8 @@ async def llama_ingest():
         batch_slugs = all_protocol_slugs[i:i+max_concurrent_tasks]
         tasks = [download_and_process_single_protocol(slug) for slug in batch_slugs]
         await asyncio.gather(*tasks)
+
+    await update_mapping()
 
 if __name__ == "__main__":
     asyncio.run(llama_ingest())

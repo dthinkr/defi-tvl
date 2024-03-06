@@ -1,31 +1,28 @@
 from fastapi import FastAPI, HTTPException, Query, Path
 from config.etl_network import ETLNetwork
 from config.query import BigQueryClient, MotherduckClient
-from datetime import datetime
-from dateutil.relativedelta import relativedelta
 
 app = FastAPI()
 
-
-try:
-    bq = MotherduckClient()
-except Exception:
-    bq = BigQueryClient()
+bq = MotherduckClient()
     
 etl_network = ETLNetwork(bq=bq)
 
 @app.get("/network-json/{date_input}", summary="Network Data")
 async def get_network_json(
-    date_input: str = Path(..., description="Date in 'YYYY', 'YYYY-MM', or 'YYYY-MM-DD' format."),
+    date_input: str = Path(..., description="Date in 'YYYY-MM-DD' format."),
     TOP_X: int = Query(50, description="Number of top connections."),
-    mode: str = Query('usd', description="'usd' or 'qty'.")
+    granularity: str = Query('daily', description=", 'daily', 'monthly', 'yearly'."),
+    mode: str = Query('usd', description="'usd' or 'qty'."),
+    type: str = Query(None, description="Aggregate by type.")
+
 ):
     """
     Retrieves network data for a given date with automatic granularity detection.
     """
     try:
-        C = bq.compare_periods(date_input)
-        network_json = etl_network.process_dataframe(C, TOP_X=TOP_X, mode=mode)
+        C = bq.compare_periods(date_input, granularity=granularity)
+        network_json = etl_network.process_dataframe(C, TOP_X=TOP_X, mode=mode, type=type)
         return network_json
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

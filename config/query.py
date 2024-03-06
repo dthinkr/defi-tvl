@@ -158,7 +158,7 @@ class BigQueryClient:
         """
         return self._execute_query(query)
     
-    def compare_months(self, year1: int, month1: int, year2: int, month2: int, table: str = TABLES['C']) -> pd.DataFrame:
+    def compare_periods(self, year1: int, month1: int, year2: int, month2: int, table: str = TABLES['C']) -> pd.DataFrame:
         """Compare monthly aggregated data between two months."""
         query = f"""
         WITH month1_data AS (
@@ -167,8 +167,8 @@ class BigQueryClient:
                 chain_name,
                 token_name,
                 DATE_TRUNC(DATE(TIMESTAMP_SECONDS(CAST(ROUND(date) AS INT64))), MONTH) AS year_month,
-                AVG(quantity) AS qty_m1_avg,
-                AVG(value_usd) AS usd_m1_avg
+                AVG(quantity) AS qty,
+                AVG(value_usd) AS usd
             FROM
                 {self._get_table_name(table)}
             WHERE
@@ -199,19 +199,19 @@ class BigQueryClient:
             m1.token_name,
             m1.year_month AS month1,
             m2.year_month AS month2,
-            m1.qty_m1_avg,
+            m1.qty,
             m2.qty_m2_avg,
-            m1.usd_m1_avg,
+            m1.usd,
             m2.usd_m2_avg,
-            m2.qty_m2_avg - m1.qty_m1_avg AS qty_change,
-            m2.usd_m2_avg - m1.usd_m1_avg AS usd_change
+            m2.qty_m2_avg - m1.qty AS qty_change,
+            m2.usd_m2_avg - m1.usd AS usd_change
         FROM
             month1_data m1
         FULL OUTER JOIN
             month2_data m2 ON m1.id = m2.id AND m1.chain_name = m2.chain_name AND m1.token_name = m2.token_name
         WHERE
-            m2.qty_m2_avg - m1.qty_m1_avg != 0 OR
-            m2.usd_m2_avg - m1.usd_m1_avg != 0
+            m2.qty_m2_avg - m1.qty != 0 OR
+            m2.usd_m2_avg - m1.usd != 0
         """
         return self._execute_query(query)
     
@@ -281,50 +281,67 @@ class MotherduckClient(BigQueryClient):
         Returns:
         - str: A DuckDB-compatible SQL expression for date truncation.
         """
-        if granularity == 'daily':
-            return "DATE_TRUNC('day', TIMESTAMP 'epoch' + C.date * INTERVAL '1 second')"
-        elif granularity == 'weekly':
-            return "DATE_TRUNC('week', TIMESTAMP 'epoch' + C.date * INTERVAL '1 second')"
-        elif granularity == 'monthly':
-            return "DATE_TRUNC('month', TIMESTAMP 'epoch' + C.date * INTERVAL '1 second')"
-        elif granularity == 'yearly':
-            return "DATE_TRUNC('year', TIMESTAMP 'epoch' + C.date * INTERVAL '1 second')"
-        else:
-            raise ValueError(f"Unsupported granularity: {granularity}")
-        
+        expressions = {
+            'daily': "DATE_TRUNC('day', TIMESTAMP 'epoch' + C.date * INTERVAL '1 second')",
+            'weekly': "DATE_TRUNC('week', TIMESTAMP 'epoch' + C.date * INTERVAL '1 second')",
+            'monthly': "DATE_TRUNC('month', TIMESTAMP 'epoch' + C.date * INTERVAL '1 second')",
+            'yearly': "DATE_TRUNC('year', TIMESTAMP 'epoch' + C.date * INTERVAL '1 second')"
+        }
+        return expressions.get(granularity, f"Unsupported granularity: {granularity}")
+    
     def compare_periods(self, input_date: str, granularity: str) -> pd.DataFrame:
         parsed_date = parse(input_date)
-        
-        # Calculate start and end dates based on granularity
+        start_date = datetime(parsed_date.year, parsed_date.month, parsed_date.day)
+
         if granularity == 'yearly':
-            start_date = datetime(parsed_date.year, 1, 1).strftime('%Y-%m-%d')
-            end_date = (datetime(parsed_date.year, 1, 1) + relativedelta(years=1)).strftime('%Y-%m-%d')
+            end_date = start_date + relativedelta(years=1)
         elif granularity == 'monthly':
-            start_date = datetime(parsed_date.year, parsed_date.month, 1).strftime('%Y-%m-%d')
-            end_date = (datetime(parsed_date.year, parsed_date.month, 1) + relativedelta(months=1)).strftime('%Y-%m-%d')
+            end_date = start_date + relativedelta(months=1)
+        elif granularity == 'weekly':
+            end_date = start_date + relativedelta(days=7)
         elif granularity == 'daily':
-            start_date = datetime(parsed_date.year, parsed_date.month, parsed_date.day).strftime('%Y-%m-%d')
-            end_date = (datetime(parsed_date.year, parsed_date.month, parsed_date.day) + relativedelta(days=1)).strftime('%Y-%m-%d')
+            end_date = start_date + relativedelta(days=1)
         else:
             raise ValueError(f"Unsupported granularity: {granularity}")
         
-        # Retrieve data using _get_aggregated_data for the start and end dates
-        query = self._get_aggregated_data(TABLES['C'], granularity, start_date=start_date, end_date=end_date, specific_dates_only=True)
+
+        # Format dates as strings for use in queries
+        start_date = start_date.strftime('%Y-%m-%d')
+        end_date = end_date.strftime('%Y-%m-%d')
+
+        print(start_date, end_date)
+        
+        """TODO: DOES NOT WORK FOR WEEKLY GRANULARITY. """
+        query = self._get_aggregated_data(TABLES['C'], granularity, start_date=start_date, end_date=end_date, edge_dates_only=False)
         df = self._execute_query(query)
-        
-        # Ensure the DataFrame is sorted to make sure start_date comes before end_date for each group
+
         df.sort_values(by=['id', 'chain_name', 'token_name', 'aggregated_date'], inplace=True)
-        
-        # Calculate changes by subtracting start date values from end date values for each group
-        df['usd_change'] = df.groupby(['id', 'chain_name', 'token_name'])['avg_total_value_usd'].diff()
-        df['qty_change'] = df.groupby(['id', 'chain_name', 'token_name'])['avg_total_quantity'].diff()
-        
-        # Filter out the start date rows to keep only the end date rows with the calculated changes
-        df_filtered = df.dropna(subset=['usd_change', 'qty_change'])
-        
-        return df_filtered    
+
+        # Calculate changes across the period
+        df['usd_change'] = df.groupby(['id', 'chain_name', 'token_name'])['usd'].diff()
+        df['qty_change'] = df.groupby(['id', 'chain_name', 'token_name'])['qty'].diff()
+
+        # Isolate start date values and prepare for merging, including aggregated_date
+        start_date_df = df[df['aggregated_date'] == start_date][['id', 'chain_name', 'token_name', 'usd', 'qty', 'aggregated_date']].copy()
+        start_date_df.rename(columns={'usd': 'start_usd', 'qty': 'start_qty', 'aggregated_date': 'start_date'}, inplace=True)
+
+        # Merge start date values with changes
+        df_final = pd.merge(df, start_date_df, on=['id', 'chain_name', 'token_name'], how='left')
+
+        # Filter to keep only rows with changes
+        df_final = df_final.dropna(subset=['usd_change', 'qty_change'])
+
+        # Replace original qty, usd, and aggregated_date with start date values
+        df_final['usd'] = df_final['start_usd']
+        df_final['qty'] = df_final['start_qty']
+        df_final['aggregated_date'] = df_final['start_date']
+
+        # Drop the temporary columns used for merging
+        df_final.drop(['start_usd', 'start_qty', 'start_date'], axis=1, inplace=True)
+
+        return df_final
     
-    def _get_aggregated_data(self, table_name: str, granularity: str, token_name: str = None, protocol_name: str = None, start_date: str = None, end_date: str = None, specific_dates_only: bool = False) -> str:
+    def _get_aggregated_data(self, table_name: str, granularity: str, token_name: str = None, protocol_name: str = None, start_date: str = None, end_date: str = None, edge_dates_only: bool = False) -> str:
         from datetime import datetime
         date_trunc_expr = self._get_date_trunc_expr(granularity)
         token_filter = f"AND C.token_name = '{token_name}'" if token_name else ""
@@ -333,7 +350,7 @@ class MotherduckClient(BigQueryClient):
         if start_date and end_date:
             start_timestamp = int(datetime.strptime(start_date, '%Y-%m-%d').timestamp())
             end_timestamp = int(datetime.strptime(end_date, '%Y-%m-%d').timestamp())
-            if specific_dates_only:
+            if edge_dates_only:
                 date_filter = f"AND CAST(C.date AS BIGINT) IN ({start_timestamp}, {end_timestamp})"
             else:
                 date_filter = f"AND CAST(C.date AS BIGINT) BETWEEN {start_timestamp} AND {end_timestamp}"
@@ -369,8 +386,8 @@ class MotherduckClient(BigQueryClient):
             type,
             chain_name,
             token_name,
-            AVG(quantity) as avg_total_quantity,
-            AVG(value_usd) as avg_total_value_usd
+            AVG(quantity) as qty,
+            AVG(value_usd) as usd
         FROM AggregatedData
         GROUP BY
             aggregated_date,
