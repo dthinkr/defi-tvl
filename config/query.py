@@ -292,81 +292,51 @@ class MotherduckClient(BigQueryClient):
         else:
             raise ValueError(f"Unsupported granularity: {granularity}")
         
-
     def compare_periods(self, input_date: str, granularity: str) -> pd.DataFrame:
         parsed_date = parse(input_date)
         
         # Calculate start and end dates based on granularity
         if granularity == 'yearly':
-            start_date = datetime(parsed_date.year, 1, 1)
-            end_date = start_date + relativedelta(years=1)
+            start_date = datetime(parsed_date.year, 1, 1).strftime('%Y-%m-%d')
+            end_date = (datetime(parsed_date.year, 1, 1) + relativedelta(years=1)).strftime('%Y-%m-%d')
         elif granularity == 'monthly':
-            start_date = datetime(parsed_date.year, parsed_date.month, 1)
-            end_date = start_date + relativedelta(months=1)
+            start_date = datetime(parsed_date.year, parsed_date.month, 1).strftime('%Y-%m-%d')
+            end_date = (datetime(parsed_date.year, parsed_date.month, 1) + relativedelta(months=1)).strftime('%Y-%m-%d')
         elif granularity == 'daily':
-            start_date = datetime(parsed_date.year, parsed_date.month, parsed_date.day)
-            end_date = start_date + relativedelta(days=1)
+            start_date = datetime(parsed_date.year, parsed_date.month, parsed_date.day).strftime('%Y-%m-%d')
+            end_date = (datetime(parsed_date.year, parsed_date.month, parsed_date.day) + relativedelta(days=1)).strftime('%Y-%m-%d')
         else:
             raise ValueError(f"Unsupported granularity: {granularity}")
         
-        # Convert dates to Unix timestamp for comparison
-        start_timestamp = int(start_date.timestamp())
-        end_timestamp = int(end_date.timestamp())
+        # Retrieve data using _get_aggregated_data for the start and end dates
+        query = self._get_aggregated_data(TABLES['C'], granularity, start_date=start_date, end_date=end_date, specific_dates_only=True)
+        df = self._execute_query(query)
         
-        # Adjusting date_trunc_expr for DuckDB and Unix timestamp
-        date_trunc_expr = self._get_date_trunc_expr(granularity).replace("C.date", "date")
+        # Ensure the DataFrame is sorted to make sure start_date comes before end_date for each group
+        df.sort_values(by=['id', 'chain_name', 'token_name', 'aggregated_date'], inplace=True)
         
-        table_name = self._get_table_name(TABLES['C'])  # Ensure this returns the correct table name
+        # Calculate changes by subtracting start date values from end date values for each group
+        df['usd_change'] = df.groupby(['id', 'chain_name', 'token_name'])['avg_total_value_usd'].diff()
+        df['qty_change'] = df.groupby(['id', 'chain_name', 'token_name'])['avg_total_quantity'].diff()
         
-        # Adjusted query for Unix timestamp and correct period comparison
-        query = f"""
-        WITH period_data AS (
-            SELECT
-                id,
-                chain_name,
-                token_name,
-                {date_trunc_expr} AS period,
-                AVG(quantity) AS avg_quantity,
-                AVG(value_usd) AS avg_value_usd
-            FROM
-                {table_name}
-            WHERE
-                date >= {start_timestamp} AND
-                date < {end_timestamp}
-            GROUP BY
-                id, chain_name, token_name, period
-        )
-        SELECT
-            id,
-            chain_name,
-            token_name,
-            MIN(period) AS start_period,
-            MAX(period) AS end_period,
-            AVG(avg_quantity) OVER(PARTITION BY id, chain_name, token_name ORDER BY period) AS avg_quantity,
-            AVG(avg_value_usd) OVER(PARTITION BY id, chain_name, token_name ORDER BY period) AS avg_value_usd,
-            LAG(avg_quantity, 1) OVER(PARTITION BY id, chain_name, token_name ORDER BY period) AS prev_avg_quantity,
-            LAG(avg_value_usd, 1) OVER(PARTITION BY id, chain_name, token_name ORDER BY period) AS prev_avg_value_usd
-        FROM period_data
-        """
+        # Filter out the start date rows to keep only the end date rows with the calculated changes
+        df_filtered = df.dropna(subset=['usd_change', 'qty_change'])
         
-        return self._execute_query(query)
+        return df_filtered    
     
-    def _get_aggregated_data(self, table_name: str, granularity: str, token_name: str = None, protocol_name: str = None) -> str:
-        """
-        Returns a SQL query for retrieving aggregated data with averages over a specified period.
-        
-        Parameters:
-        - table_name (str): The name of the table to query.
-        - token_name (str): Optional. The name of the token to filter by.
-        - protocol_name (str): Optional. The name of the protocol to filter by.
-        - granularity (str): The granularity for date truncation, e.g., 'daily', 'weekly', 'monthly'.
-        
-        Returns:
-        - str: A SQL query string.
-        """
+    def _get_aggregated_data(self, table_name: str, granularity: str, token_name: str = None, protocol_name: str = None, start_date: str = None, end_date: str = None, specific_dates_only: bool = False) -> str:
+        from datetime import datetime
         date_trunc_expr = self._get_date_trunc_expr(granularity)
         token_filter = f"AND C.token_name = '{token_name}'" if token_name else ""
         protocol_filter = f"AND A.name = '{protocol_name}'" if protocol_name else ""
+        date_filter = ""
+        if start_date and end_date:
+            start_timestamp = int(datetime.strptime(start_date, '%Y-%m-%d').timestamp())
+            end_timestamp = int(datetime.strptime(end_date, '%Y-%m-%d').timestamp())
+            if specific_dates_only:
+                date_filter = f"AND CAST(C.date AS BIGINT) IN ({start_timestamp}, {end_timestamp})"
+            else:
+                date_filter = f"AND CAST(C.date AS BIGINT) BETWEEN {start_timestamp} AND {end_timestamp}"
 
         query = f"""
         WITH AggregatedData AS (
@@ -378,8 +348,8 @@ class MotherduckClient(BigQueryClient):
                 A.type as type,
                 C.chain_name,
                 C.token_name,
-                SUM(C.quantity) as sum_quantity,
-                SUM(C.value_usd) as sum_value_usd
+                C.quantity,
+                C.value_usd
             FROM 
                 {self._get_table_name(table_name)} C
             INNER JOIN 
@@ -389,8 +359,7 @@ class MotherduckClient(BigQueryClient):
                 C.value_usd > 0
                 {token_filter}
                 {protocol_filter}
-            GROUP BY 
-                aggregated_date, C.id, A.name, A.category, A.type, C.chain_name, C.token_name
+                {date_filter}
         )
         SELECT
             aggregated_date,
@@ -400,8 +369,8 @@ class MotherduckClient(BigQueryClient):
             type,
             chain_name,
             token_name,
-            AVG(sum_quantity) as avg_total_quantity,
-            AVG(sum_value_usd) as avg_total_value_usd
+            AVG(quantity) as avg_total_quantity,
+            AVG(value_usd) as avg_total_value_usd
         FROM AggregatedData
         GROUP BY
             aggregated_date,
