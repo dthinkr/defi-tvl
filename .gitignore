@@ -4,7 +4,6 @@ key.json
 *.parquet
 *.tmp
 *.html
-*.png
 *.pyc
 .*
 __*
