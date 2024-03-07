@@ -141,44 +141,8 @@ async def clear_motherduck_table(tables: list):
             con.execute(f"DELETE FROM {table}")
         
 @task(retries=3, retry_delay_seconds=[1, 10, 100])
-async def upload_df_to_motherduck(parquet_file_path, table_name, con=duckdb.connect(f'md:?motherduck_token={MD_TOKEN}')):
-    # Generate a unique hash for the file path to use as the temporary table name
-    file_path_hash = hashlib.md5(parquet_file_path.encode()).hexdigest()
-    temp_table_name = f"temp_{file_path_hash}"
-
-    # Create a temporary table from the Parquet file
-    con.execute(f"CREATE TEMPORARY TABLE {temp_table_name} AS SELECT * FROM read_parquet('{parquet_file_path}')")
-
-    if table_name == TABLES['A']:  # Assuming TABLES['A'] holds the name of table A
-        # For table A, only check if there is a new id
-        con.execute(f"""
-        INSERT INTO {table_name}
-        SELECT t.*
-        FROM {temp_table_name} t
-        WHERE NOT EXISTS (
-            SELECT 1 FROM {table_name} tt
-            WHERE tt.id = t.id
-        )
-        """)
-    elif table_name == TABLES['C']:
-        # For other tables, use the existing logic
-        con.execute(f"""
-        INSERT INTO {table_name} (id, chain_name, token_name, date, quantity, value_usd)
-        SELECT t.id, t.chain_name, t.token_name, t.date, t.quantity, t.value_usd
-        FROM {temp_table_name} t
-        WHERE NOT EXISTS (
-            SELECT 1 FROM {table_name} tt
-            WHERE tt.id = t.id 
-            AND tt.chain_name = t.chain_name 
-            AND tt.token_name = t.token_name 
-            AND tt.date = t.date
-        )
-        """)
-
-    # Optionally, drop the temporary table
-    con.execute(f"DROP TABLE IF EXISTS {temp_table_name}")
-
-    con.close()
+async def upload_df_to_motherduck(file_path, table_name, con=duckdb.connect(f'md:?motherduck_token={MD_TOKEN}')):
+    con.execute(f"INSERT INTO {table_name} SELECT * FROM '{file_path}'")
 
 @task
 async def download_and_process_single_protocol(slug):
