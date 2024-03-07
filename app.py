@@ -35,10 +35,17 @@ def is_port_in_use(port):
 def is_uvicorn_running():
     return is_port_in_use(8000)
 
-@st.cache_data
-def get_network_data(year_month, TOP_X=50, granularity='daily', mode='usd'):
-    url = f"http://127.0.0.1:8000/network-json/{year_month}?TOP_X={TOP_X}&granularity={granularity}&mode={mode}"
-    response = requests.get(url)
+def get_network_data(year_month, TOP_X=None, granularity='daily', mode='usd', type=True):
+    base_url = f"http://127.0.0.1:8000/network-json/{year_month}"
+    params = {
+        "granularity": granularity,
+        "mode": mode,
+        "type": type
+    }
+    if TOP_X is not None:
+        params["TOP_X"] = TOP_X
+
+    response = requests.get(base_url, params=params)
     if response.status_code == 200:
         return response.json()
     else:
@@ -55,14 +62,6 @@ def display_network(network_json):
     # display_color_legend(category_colors)
     return visualizer.visualize_network(network_json, category_colors)
 
-
-# The display_color_legend function remains unchanged
-def display_color_legend(category_colors):
-    raise NotImplementedError("Too many categories identified. Needs to change logic.")
-    st.write("## Color Legend for Nodes:")
-    st.write(category_colors)
-    for category, color in category_colors.items():
-        st.markdown(f"- ![{category}](https://via.placeholder.com/15/{color[1:]}/000000?text=+) `{category}`", unsafe_allow_html=True)
 
 @st.cache_data
 def load_token_distribution(_bq: BigQueryClient, token_name: str, granularity: str):
@@ -187,15 +186,17 @@ def main():
         options = [date.strftime("%Y-%m-%d") if granularity == 'daily' else date.strftime("%Y-%m") for date in date_range]
 
     # Create a slider for date selection
-    selected_date = st.select_slider(f"Select {granularity.capitalize()}:", options=options, value=options[-1])
+    selected_date = st.select_slider(f"Select {granularity.capitalize()}:", options=options, value=options[len(options)//2])
 
-    top_x = st.number_input("Select the number of nodes shown, the rest are aggregated:", min_value=1, max_value=500, value=30, step=10)
+    top_x = st.number_input("Select the number of nodes shown, the rest are aggregated:", min_value=1, max_value=500, value=None, step=10)
     mode_options = ['usd', 'qty']
     selected_mode = st.selectbox("Display token amount or token USD value:", options=mode_options, index=0)  # Default to 'usd'
     
+    type_options = [True, False]
+    type = st.selectbox("Aggregate by type:", options=type_options, index=0) 
 
     # Fetch the network data for the selected month
-    network_data = get_network_data(selected_date, TOP_X=top_x, granularity = granularity, mode=selected_mode)
+    network_data = get_network_data(selected_date, TOP_X=top_x, granularity = granularity, mode=selected_mode, type = type)
     # unique_ids = len(set(item['id'] for item in network_data['nodes']))
     # total_size = sum(item['size'] for item in network_data['nodes'])
 

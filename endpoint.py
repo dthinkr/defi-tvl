@@ -14,7 +14,7 @@ async def get_network_json(
     TOP_X: int = Query(50, description="Number of top connections."),
     granularity: str = Query('daily', description=", 'daily', 'monthly', 'yearly'."),
     mode: str = Query('usd', description="'usd' or 'qty'."),
-    type: str = Query(None, description="Aggregate by type.")
+    type: bool = Query(False, description="Aggregate by type.")
 
 ):
     """
@@ -22,6 +22,7 @@ async def get_network_json(
     """
     try:
         C = bq.compare_periods(date_input, granularity=granularity)
+        print(C.head(1))
         network_json = etl_network.process_dataframe(C, TOP_X=TOP_X, mode=mode, type=type)
         return network_json
     except Exception as e:

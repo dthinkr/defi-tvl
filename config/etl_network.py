@@ -166,8 +166,6 @@ class ETLNetwork:
                         categories[category_name][token]['id'] = token  
                     else:
                         categories[category_name][token]['id'] = category_name
-
-
         """ 
             - further update using similarity scores
             - read ummapped tokens
@@ -192,7 +190,33 @@ class ETLNetwork:
 
         self._save_json(id_to_info, 'id_to_info.json')
 
-    def process_dataframe(self, C: pd.DataFrame, TOP_X: int = 50, mode: str = 'usd', type: str = None):
+
+    def _process_edges(self, links):
+    # Step 1: Aggregate edges
+        edge_aggregate = {}
+        for link in links:
+            key = tuple(sorted([link['source'], link['target']]))  # Sort to treat A->B and B->A the same
+            if key not in edge_aggregate:
+                edge_aggregate[key] = 0
+            # Add or subtract based on the original direction
+            if link['source'] < link['target']:
+                edge_aggregate[key] += link['size']
+            else:
+                edge_aggregate[key] -= link['size']
+
+        # Step 2: Process aggregated edges to keep only net positive values and determine direction
+        final_links = []
+        for (node1, node2), net_size in edge_aggregate.items():
+            if net_size > 0:
+                final_links.append({'source': node1, 'target': node2, 'size': net_size})
+            elif net_size < 0:
+                final_links.append({'source': node2, 'target': node1, 'size': -net_size})
+            # If net_size == 0, the edge is effectively canceled out and not added
+
+        return final_links
+
+
+    def process_dataframe(self, C: pd.DataFrame, TOP_X: int = 50, mode: str = 'usd', type: bool = False):
         """
         Processes a DataFrame to map tokens to protocols, adjust transaction flows, and prepare the data for visualization.
 
@@ -266,42 +290,57 @@ class ETLNetwork:
             C.groupby('to_node')[change_column].sum(), fill_value=0
         )
 
-        # Identify the top 100 nodes
-        top_X_nodes = total_change_per_node.sort_values(ascending=False).head(TOP_X).index
+        if TOP_X is not None and TOP_X > 0:
+            # Identify the top 100 nodes
+            top_X_nodes = total_change_per_node.sort_values(ascending=False).head(TOP_X).index
 
-        # Mark rows with nodes not in the top 100 as 'AGGREGATED'
-        C['from_node'] = C['from_node'].apply(lambda x: x if x in top_X_nodes else 'AGGREGATED')
-        C['to_node'] = C['to_node'].apply(lambda x: x if x in top_X_nodes else 'AGGREGATED')
+            # Mark rows with nodes not in the top 100 as 'AGGREGATED'
+            C['from_node'] = C['from_node'].apply(lambda x: x if x in top_X_nodes else 'AGGREGATED')
+            C['to_node'] = C['to_node'].apply(lambda x: x if x in top_X_nodes else 'AGGREGATED')
 
-        # Calculate node sizes before removing edges within 'AGGREGATED'
-        node_sizes = C.groupby('from_node')[from_column].sum().add(
-            C.groupby('to_node')[to_column].sum(), fill_value=0
-        )
+            # Calculate node sizes before removing edges within 'AGGREGATED'
+            node_sizes = C.groupby('from_node')[from_column].sum().add(
+                C.groupby('to_node')[to_column].sum(), fill_value=0
+            )
 
-        # Now, remove edges within 'AGGREGATED'
-        C_filtered = C[(C['from_node'] != 'AGGREGATED') | (C['to_node'] != 'AGGREGATED')]
+            # Now, remove edges within 'AGGREGATED'
+            C_filtered = C[(C['from_node'] != 'AGGREGATED') | (C['to_node'] != 'AGGREGATED')]
 
-        # Prepare nodes and links for JSON, after filtering
-        nodes = [{'id': node, 'size': size, 'category': get_category(node)} for node, size in node_sizes.items() if node != 'AGGREGATED' or (node == 'AGGREGATED' and size > 0)]
+        if type:  # If type is True, aggregate nodes by unique categories
+            # Aggregate total changes by category
+            category_change = C.groupby(C['from_node'].apply(get_category))[change_column].sum().add(
+                C.groupby(C['to_node'].apply(get_category))[change_column].sum(), fill_value=0
+            )
+            
+            # Prepare nodes based on unique categories
+            nodes = [{'id': category, 'size': size, 'category': category} for category, size in category_change.items()]
+            
+            # Prepare links based on categories
+            C['from_node_category'] = C['from_node'].apply(get_category)
+            C['to_node_category'] = C['to_node'].apply(get_category)
+            links = C.apply(lambda row: {
+                'source': row['from_node_category'],
+                'target': row['to_node_category'],
+                'chain': row['chain_name'],
+                'size': row[change_column]
+            }, axis=1).drop_duplicates().tolist()
 
-        links = C_filtered.apply(lambda row: {
-            'source': row['from_node'],
-            'target': row['to_node'],
-            'chain': row['chain_name'],
-            'size': row[change_column]
-        }, axis=1).tolist()
+        else:  # If type is False, aggregate nodes by unique names
 
-        # Combine into a single JSON structure
+            nodes = [{'id': node, 'size': size, 'category': get_category(node)} for node, size in node_sizes.items() if node != 'AGGREGATED' or (node == 'AGGREGATED' and size > 0)]
+
+            links = C_filtered.apply(lambda row: {
+                'source': row['from_node'],
+                'target': row['to_node'],
+                'chain': row['chain_name'],
+                'size': row[change_column]
+            }, axis=1).tolist()
+
         network_json = {
             'nodes': nodes,
             'links': links
         }
 
+        network_json['links'] = self._process_edges(network_json['links'])
+
         return network_json
-
-
-        
-
-
-
-

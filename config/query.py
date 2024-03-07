@@ -308,8 +308,6 @@ class MotherduckClient(BigQueryClient):
         # Format dates as strings for use in queries
         start_date = start_date.strftime('%Y-%m-%d')
         end_date = end_date.strftime('%Y-%m-%d')
-
-        print(start_date, end_date)
         
         """TODO: DOES NOT WORK FOR WEEKLY GRANULARITY. """
         query = self._get_aggregated_data(TABLES['C'], granularity, start_date=start_date, end_date=end_date, edge_dates_only=False)

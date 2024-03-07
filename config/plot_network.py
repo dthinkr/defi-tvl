@@ -46,11 +46,15 @@ class NetworkVisualizer:
         return normalized * (max_visual - min_visual) + min_visual
 
 
-    def visualize_network(self, network_json, category_colors):
+    def visualize_network(self, network_json, category_colors=None):
+        # Default color for nodes if category_colors is not provided or a category is missing
+        default_color = "#999999"  # Example gray color, adjust as needed
 
         all_sizes = [node['size'] for node in network_json['nodes']]
         for node in network_json['nodes']:
-            self.net.add_node(node['id'], label=node['id'], size=self.normalize_size(node['size'], all_sizes), color=category_colors[node['category']])
+            # Determine the color for the node
+            node_color = category_colors.get(node['category'], default_color) if category_colors else default_color
+            self.net.add_node(node['id'], label=node['id'], size=self.normalize_size(node['size'], all_sizes), color=node_color)
 
         edge_data = defaultdict(lambda: {'size': 0, 'chains': defaultdict(int)})
         for link in network_json['links']:

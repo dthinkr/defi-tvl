@@ -41,6 +41,7 @@ CATEGORY_MAPPING = {
     "Trading & Exchanges": [
         "Bridge",
         "CEX",
+        "DEX Aggregator",
         "Cross Chain",
         "Dexes",
         "Derivatives",
@@ -56,6 +57,8 @@ CATEGORY_MAPPING = {
         "RWA Lending",
         "Uncollateralized Lending",
         "RWA",
+        "Liquidity Restaking",
+        "Restaking"
     ],
     "Infrastructure, Services & Financial Products": [
         "Chain",
@@ -70,6 +73,7 @@ CATEGORY_MAPPING = {
         "Launchpad",
         "Prediction Market",
         "Staking Pool",
+        "Wallets"
     ],
     "Privacy & Security": ["Privacy"],
     "Others": ["SoFi"],
