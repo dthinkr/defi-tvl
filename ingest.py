@@ -11,6 +11,8 @@ import asyncio
 import psutil
 from config.etl_network import ETLNetwork
 from config.query import MotherduckClient
+import hashlib
+
 
 def load_config():
     with open("config.yaml", "r") as file:
@@ -100,7 +102,7 @@ def download_tvl_data():
         with open(FAILED_SLUGS_FILE, "wb") as f:
             pickle.dump(failed_slugs, f)
 
-def extract_token_tvl(file_path, latest_date=None):
+def extract_token_tvl(file_path):
     results = []
     with open(file_path, 'r') as f:
         data = json.load(f)
@@ -111,8 +113,6 @@ def extract_token_tvl(file_path, latest_date=None):
 
         for usd_entry, quantity_entry in zip(tokens_usd, tokens_quantity):
             date = usd_entry['date']
-            if latest_date is not None and date <= latest_date:
-                continue
             for token_name, value_usd in usd_entry['tokens'].items():
                 quantity = quantity_entry['tokens'].get(token_name, 0)
                 results.append([data['id'], chain_name, date, token_name, quantity, value_usd])
@@ -126,8 +126,8 @@ def extract_token_tvl(file_path, latest_date=None):
     return df
 
 @task
-async def process_single_file(con, json_file_path, parquet_file_path, latest_date=None):
-    df = extract_token_tvl(json_file_path, latest_date)
+async def process_single_file(con, json_file_path, parquet_file_path):
+    df = extract_token_tvl(json_file_path)
     if not df.empty:
         df.to_parquet(parquet_file_path, index=False)
         await upload_df_to_motherduck.fn(parquet_file_path, TABLES['C'], con)
@@ -141,12 +141,43 @@ async def clear_motherduck_table(tables: list):
             con.execute(f"DELETE FROM {table}")
         
 @task(retries=3, retry_delay_seconds=[1, 10, 100])
-async def upload_df_to_motherduck(file_path, table_name, con = duckdb.connect(f'md:?motherduck_token={MD_TOKEN}')):
-    """TODO: WRITE WRITE CONFCLIT WHEN TABLE C DOES NOT EXIST. 
-    duckdb.duckdb.TransactionException: TransactionContext Error: Catalog write-write conflict on create with "C_protocol_token_tvl"""
-    # con = duckdb.connect(f'md:?motherduck_token={MD_TOKEN}')
-    # con.execute(f"CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * FROM '{file_path}'")
-    con.execute(f"INSERT INTO {table_name} SELECT * FROM '{file_path}'")
+async def upload_df_to_motherduck(parquet_file_path, table_name, con=duckdb.connect(f'md:?motherduck_token={MD_TOKEN}')):
+    # Generate a unique hash for the file path to use as the temporary table name
+    file_path_hash = hashlib.md5(parquet_file_path.encode()).hexdigest()
+    temp_table_name = f"temp_{file_path_hash}"
+
+    # Create a temporary table from the Parquet file
+    con.execute(f"CREATE TEMPORARY TABLE {temp_table_name} AS SELECT * FROM read_parquet('{parquet_file_path}')")
+
+    if table_name == TABLES['A']:  # Assuming TABLES['A'] holds the name of table A
+        # For table A, only check if there is a new id
+        con.execute(f"""
+        INSERT INTO {table_name}
+        SELECT t.*
+        FROM {temp_table_name} t
+        WHERE NOT EXISTS (
+            SELECT 1 FROM {table_name} tt
+            WHERE tt.id = t.id
+        )
+        """)
+    elif table_name == TABLES['C']:
+        # For other tables, use the existing logic
+        con.execute(f"""
+        INSERT INTO {table_name} (id, chain_name, token_name, date, quantity, value_usd)
+        SELECT t.id, t.chain_name, t.token_name, t.date, t.quantity, t.value_usd
+        FROM {temp_table_name} t
+        WHERE NOT EXISTS (
+            SELECT 1 FROM {table_name} tt
+            WHERE tt.id = t.id 
+            AND tt.chain_name = t.chain_name 
+            AND tt.token_name = t.token_name 
+            AND tt.date = t.date
+        )
+        """)
+
+    # Optionally, drop the temporary table
+    con.execute(f"DROP TABLE IF EXISTS {temp_table_name}")
+
     con.close()
 
 @task
@@ -155,14 +186,10 @@ async def download_and_process_single_protocol(slug):
     data = fetch_data(url)
     if data:
         con = duckdb.connect(f'md:?motherduck_token={MD_TOKEN}')
-        unique_id = data['id']
-        latest_date_query = f"SELECT MAX(date) FROM {TABLES['C']} WHERE id = '{unique_id}'"
-        latest_date_result = con.execute(latest_date_query).fetchone()
-        latest_date = latest_date_result[0] if latest_date_result else None
         json_file_path = os.path.join(DATA_DIR, f"{slug}.json")
         parquet_file_path = os.path.join(DATA_DIR, f"{slug}.parquet")
         save_data_to_file(data, json_file_path)
-        await process_single_file.fn(con, json_file_path, parquet_file_path, latest_date)
+        await process_single_file.fn(con, json_file_path, parquet_file_path)
         os.remove(json_file_path)
 
 @task

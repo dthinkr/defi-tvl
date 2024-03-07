@@ -192,26 +192,12 @@ class ETLNetwork:
 
 
     def _process_edges(self, links):
-    # Step 1: Aggregate edges
         edge_aggregate = {}
         for link in links:
-            key = tuple(sorted([link['source'], link['target']]))  # Sort to treat A->B and B->A the same
-            if key not in edge_aggregate:
-                edge_aggregate[key] = 0
-            # Add or subtract based on the original direction
-            if link['source'] < link['target']:
-                edge_aggregate[key] += link['size']
-            else:
-                edge_aggregate[key] -= link['size']
+            key = tuple(sorted([link['source'], link['target']]))
+            edge_aggregate[key] = edge_aggregate.get(key, 0) + (link['size'] if link['source'] < link['target'] else -link['size'])
 
-        # Step 2: Process aggregated edges to keep only net positive values and determine direction
-        final_links = []
-        for (node1, node2), net_size in edge_aggregate.items():
-            if net_size > 0:
-                final_links.append({'source': node1, 'target': node2, 'size': net_size})
-            elif net_size < 0:
-                final_links.append({'source': node2, 'target': node1, 'size': -net_size})
-            # If net_size == 0, the edge is effectively canceled out and not added
+        final_links = [{'source': node1 if net_size > 0 else node2, 'target': node2 if net_size > 0 else node1, 'size': abs(net_size)} for (node1, node2), net_size in edge_aggregate.items() if net_size != 0]
 
         return final_links
 
@@ -291,50 +277,55 @@ class ETLNetwork:
         )
 
         if TOP_X is not None and TOP_X > 0:
-            # Identify the top 100 nodes
             top_X_nodes = total_change_per_node.sort_values(ascending=False).head(TOP_X).index
-
-            # Mark rows with nodes not in the top 100 as 'AGGREGATED'
             C['from_node'] = C['from_node'].apply(lambda x: x if x in top_X_nodes else 'AGGREGATED')
             C['to_node'] = C['to_node'].apply(lambda x: x if x in top_X_nodes else 'AGGREGATED')
 
-            # Calculate node sizes before removing edges within 'AGGREGATED'
             node_sizes = C.groupby('from_node')[from_column].sum().add(
                 C.groupby('to_node')[to_column].sum(), fill_value=0
             )
 
-            # Now, remove edges within 'AGGREGATED'
-            C_filtered = C[(C['from_node'] != 'AGGREGATED') | (C['to_node'] != 'AGGREGATED')]
-
-        if type:  # If type is True, aggregate nodes by unique categories
-            # Aggregate total changes by category
-            category_change = C.groupby(C['from_node'].apply(get_category))[change_column].sum().add(
-                C.groupby(C['to_node'].apply(get_category))[change_column].sum(), fill_value=0
-            )
-            
-            # Prepare nodes based on unique categories
-            nodes = [{'id': category, 'size': size, 'category': category} for category, size in category_change.items()]
-            
-            # Prepare links based on categories
+        if type:
             C['from_node_category'] = C['from_node'].apply(get_category)
             C['to_node_category'] = C['to_node'].apply(get_category)
-            links = C.apply(lambda row: {
-                'source': row['from_node_category'],
-                'target': row['to_node_category'],
-                'chain': row['chain_name'],
-                'size': row[change_column]
-            }, axis=1).drop_duplicates().tolist()
 
-        else:  # If type is False, aggregate nodes by unique names
+            category_change = C.groupby(C['from_node_category'])[change_column].sum().add(
+                C.groupby(C['to_node_category'])[change_column].sum(), fill_value=0
+            )
+
+            nodes = [{'id': category, 'size': size, 'category': category} for category, size in category_change.items()]
+
+            links = []
+            for (from_cat, to_cat), group in C.groupby(['from_node_category', 'to_node_category']):
+                size = group[change_column].sum()
+                links.append({'source': from_cat, 'target': to_cat, 'size': size, 'chain': 'aggregated'})
+
+            # Handling self-links for within-category transfers
+            for category in category_change.keys():
+                within_category_size = C[(C['from_node_category'] == category) & (C['to_node_category'] == category)][change_column].sum()
+                if within_category_size != 0:
+                    links.append({'source': category, 'target': category, 'size': within_category_size, 'chain': 'aggregated'})
+
+        else:
+            # Adjusted else logic to include aggregated nodes and a single self-directed edge
+            node_sizes = C.groupby('from_node')[from_column].sum().add(
+                C.groupby('to_node')[to_column].sum(), fill_value=0
+            )
 
             nodes = [{'id': node, 'size': size, 'category': get_category(node)} for node, size in node_sizes.items() if node != 'AGGREGATED' or (node == 'AGGREGATED' and size > 0)]
 
-            links = C_filtered.apply(lambda row: {
+            # Prepare links, including a single aggregated self-link if applicable
+            aggregated_size_within = C[(C['from_node'] == 'AGGREGATED') & (C['to_node'] == 'AGGREGATED')][change_column].sum()
+            links = C[(C['from_node'] != 'AGGREGATED') | (C['to_node'] != 'AGGREGATED')].apply(lambda row: {
                 'source': row['from_node'],
                 'target': row['to_node'],
                 'chain': row['chain_name'],
                 'size': row[change_column]
             }, axis=1).tolist()
+
+            if aggregated_size_within != 0:
+                links.append({'source': 'AGGREGATED', 'target': 'AGGREGATED', 'size': aggregated_size_within, 'chain': 'aggregated'})
+
 
         network_json = {
             'nodes': nodes,
