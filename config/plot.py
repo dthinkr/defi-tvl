@@ -1,5 +1,28 @@
 from pyvis.network import Network
 from collections import defaultdict
+import matplotlib.pyplot as plt
+import seaborn as sns
+import matplotx
+import pandas as pd
+
+def save_heatmap(pivot_df: pd.DataFrame):
+    # Generate heatmap
+    with plt.style.context(matplotx.styles.duftify(matplotx.styles.dracula)):
+        plt.figure(figsize=(12, 8))
+        ax = sns.heatmap(pivot_df, cbar=False)
+        plt.title('Protocol Activity Over Time')
+        plt.xlabel('Date')
+        plt.ylabel('Protocol Rank')
+        pivot_df.columns = pd.DatetimeIndex(pivot_df.columns)
+        unique_years = pivot_df.columns.year.drop_duplicates()
+        first_dates_per_year = [pivot_df.columns[pivot_df.columns.year == year][0] for year in unique_years]
+        ax.set_xticks([pivot_df.columns.get_loc(date) for date in first_dates_per_year])
+        ax.set_xticklabels([date.strftime('%Y') for date in first_dates_per_year])
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+        
+        plt.savefig('data/protocol_activity_heatmap.png')  # Adjust path as needed
+        plt.close()
 
 class NetworkVisualizer:
     def __init__(self, notebook=True, height="750px", width="100%", bgcolor="#FFFFFF", font_color="black", directed=True, cdn_resources="in_line"):

@@ -9,8 +9,8 @@
 # defi-tvl
 
 ## Protocol Activity Heatmap
-dark: data is absent
-light: data is present
+- dark: data is absent
+- light: data is present
 ![Protocol Activity Heatmap](data/protocol_activity_heatmap.png)
 
 

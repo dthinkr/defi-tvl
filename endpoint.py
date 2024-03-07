@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException, Query, Path
 from config.etl_network import ETLNetwork
 from config.query import MotherduckClient
 from fastapi.responses import HTMLResponse
-from config.plot_network import NetworkVisualizer
+from config.plot import NetworkVisualizer
 
 app = FastAPI()
 

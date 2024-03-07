@@ -11,6 +11,7 @@ import asyncio
 import psutil
 from config.etl_network import ETLNetwork
 from config.query import MotherduckClient
+from config.plot import save_heatmap
 
 def load_config():
     with open("config.yaml", "r") as file:
@@ -118,9 +119,7 @@ def extract_token_tvl(file_path):
     df = pd.DataFrame(results, columns=['id', 'chain_name', 'date', 'token_name', 'quantity', 'value_usd'])
     df['quantity'] = df['quantity'].astype('float64')
     df['value_usd'] = df['value_usd'].astype('float64')
-    
-    if df.empty:
-        get_run_logger().info(f"No new data found in {file_path}.")
+
     return df
 
 @task
@@ -171,46 +170,36 @@ def _calculate_concurrent_tasks(memory_per_task_gb=20/200, safety_factor=config[
     return max_concurrent_tasks_based_on_memory
 
 
-import matplotlib.pyplot as plt
-import seaborn as sns
-import matplotx
-
 def generate_and_save_heatmap():
-    # Connect to DuckDB
     con = duckdb.connect(f'md:?motherduck_token={MD_TOKEN}')
     
-    # SQL query to fetch data
     query = """
     SELECT id, strftime('%Y-%m-%d', CAST(to_timestamp(date) AS TIMESTAMP)) AS day, COUNT(*) as entry_count
     FROM {table_name}
     GROUP BY id, day
     ORDER BY day
-    """.format(table_name=TABLES['C'])  # Assuming TABLES['C'] is your table name
+    """.format(table_name=TABLES['C'])
     df = con.execute(query).df()
     
-    # Data preparation
     df['protocol_rank'] = df['id'].astype('category').cat.codes
     df['entry_present'] = df['entry_count'].apply(lambda x: 1 if x > 0 else 0)
     df['day'] = pd.to_datetime(df['day'])
     pivot_df = df.pivot(index="protocol_rank", columns="day", values="entry_present").fillna(0)
-    
-    # Generate heatmap
-    with plt.style.context(matplotx.styles.duftify(matplotx.styles.dracula)):
-        plt.figure(figsize=(12, 8))
-        ax = sns.heatmap(pivot_df, cbar=False)
-        plt.title('Protocol Activity Over Time')
-        plt.xlabel('Date')
-        plt.ylabel('Protocol Rank')
-        pivot_df.columns = pd.DatetimeIndex(pivot_df.columns)
-        unique_years = pivot_df.columns.year.drop_duplicates()
-        first_dates_per_year = [pivot_df.columns[pivot_df.columns.year == year][0] for year in unique_years]
-        ax.set_xticks([pivot_df.columns.get_loc(date) for date in first_dates_per_year])
-        ax.set_xticklabels([date.strftime('%Y') for date in first_dates_per_year])
-        plt.xticks(rotation=45)
-        plt.tight_layout()
-        
-        plt.savefig('data/protocol_activity_heatmap.png')  # Adjust path as needed
-        plt.close()
+
+    save_heatmap(pivot_df)
+
+def get_latest_dates_for_tokens():
+    con = duckdb.connect(f'md:?motherduck_token={MD_TOKEN}')
+    query = """
+    SELECT id, chain_name, token_name, MAX(date) as latest_date
+    FROM {table_name}
+    GROUP BY id, chain_name, token_name
+    """.format(table_name=TABLES['C']) 
+    result = con.execute(query).fetchall()
+    con.close()
+
+    latest_dates = {(row[0], row[1], row[2]): row[3] for row in result}
+    return latest_dates
 
 @flow
 async def llama_ingest():

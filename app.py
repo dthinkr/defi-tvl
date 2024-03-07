@@ -14,7 +14,7 @@ import itertools
 from config.config import CUSTOM_COLORS, TOP_N, original_names, abbreviated_names, TABLES, NETWORK_PRELIMINARIES
 from config.query import BigQueryClient, MotherduckClient
 from config.chord import ChordDiagramData
-from config.plot_network import NetworkVisualizer
+from config.plot import NetworkVisualizer
 
 import subprocess
 import requests
