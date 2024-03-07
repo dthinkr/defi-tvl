@@ -11,8 +11,6 @@ import asyncio
 import psutil
 from config.etl_network import ETLNetwork
 from config.query import MotherduckClient
-import hashlib
-
 
 def load_config():
     with open("config.yaml", "r") as file:
@@ -172,10 +170,53 @@ def _calculate_concurrent_tasks(memory_per_task_gb=20/200, safety_factor=config[
     max_concurrent_tasks_based_on_memory = int(usable_memory_gb / memory_per_task_gb)
     return max_concurrent_tasks_based_on_memory
 
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+import matplotx
+
+def generate_and_save_heatmap():
+    # Connect to DuckDB
+    con = duckdb.connect(f'md:?motherduck_token={MD_TOKEN}')
+    
+    # SQL query to fetch data
+    query = """
+    SELECT id, strftime('%Y-%m-%d', CAST(to_timestamp(date) AS TIMESTAMP)) AS day, COUNT(*) as entry_count
+    FROM {table_name}
+    GROUP BY id, day
+    ORDER BY day
+    """.format(table_name=TABLES['C'])  # Assuming TABLES['C'] is your table name
+    df = con.execute(query).df()
+    
+    # Data preparation
+    df['protocol_rank'] = df['id'].astype('category').cat.codes
+    df['entry_present'] = df['entry_count'].apply(lambda x: 1 if x > 0 else 0)
+    df['day'] = pd.to_datetime(df['day'])
+    pivot_df = df.pivot(index="protocol_rank", columns="day", values="entry_present").fillna(0)
+    
+    # Generate heatmap
+    with plt.style.context(matplotx.styles.duftify(matplotx.styles.dracula)):
+        plt.figure(figsize=(12, 8))
+        ax = sns.heatmap(pivot_df, cbar=False)
+        plt.title('Protocol Activity Over Time')
+        plt.xlabel('Date')
+        plt.ylabel('Protocol Rank')
+        pivot_df.columns = pd.DatetimeIndex(pivot_df.columns)
+        unique_years = pivot_df.columns.year.drop_duplicates()
+        first_dates_per_year = [pivot_df.columns[pivot_df.columns.year == year][0] for year in unique_years]
+        ax.set_xticks([pivot_df.columns.get_loc(date) for date in first_dates_per_year])
+        ax.set_xticklabels([date.strftime('%Y') for date in first_dates_per_year])
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+        
+        # Save the figure
+        plt.savefig('data/protocol_activity_heatmap.png')  # Adjust path as needed
+        plt.close()
+
 @flow
 async def llama_ingest():
 
-    await clear_motherduck_table([TABLES['A']])
+    await clear_motherduck_table([TABLES['A'], TABLES['C']])
     await download_protocol_headers()
     all_protocol_slugs = get_all_protocol_slugs()[:MAX_SLUGS]
 
@@ -188,6 +229,8 @@ async def llama_ingest():
         await asyncio.gather(*tasks)
 
     await update_mapping()
+
+    generate_and_save_heatmap()
 
 if __name__ == "__main__":
     asyncio.run(llama_ingest())
