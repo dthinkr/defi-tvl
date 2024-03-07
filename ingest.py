@@ -209,7 +209,6 @@ def generate_and_save_heatmap():
         plt.xticks(rotation=45)
         plt.tight_layout()
         
-        # Save the figure
         plt.savefig('data/protocol_activity_heatmap.png')  # Adjust path as needed
         plt.close()
 
