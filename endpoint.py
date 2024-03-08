@@ -3,7 +3,7 @@ from config.etl_network import ETLNetwork
 from config.query import MotherduckClient
 from fastapi.responses import HTMLResponse
 from config.plot import NetworkVisualizer
-import aioredis
+from functools import lru_cache
 
 
 app = FastAPI()
@@ -78,5 +78,30 @@ async def render_network(
         html_content = visualizer.visualize_network(network_json)
         
         return HTMLResponse(content=html_content, status_code=200)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@app.get("/unique-protocols", summary="Unique Protocol Names")
+async def unique_protocols():
+    """
+    Returns a list of unique protocol names from table A.
+    """
+    try:
+        df = bq.get_unique_protocol_names()
+        csv_data = df.to_csv(index=False)
+        return Response(content=csv_data, media_type="text/csv")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
+@app.get("/unique-token-names", summary="Unique Token Names")
+async def unique_token_names():
+    """
+    Returns a list of unique token names from the default table.
+    """
+    try:
+        df = bq.get_unique_token_names()  # No table name passed, uses default
+        csv_data = df.to_csv(index=False)
+        return Response(content=csv_data, media_type="text/csv")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

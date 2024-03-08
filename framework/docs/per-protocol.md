@@ -1,10 +1,27 @@
+# TVL Per Protocol (Static)
+
 ```js
-var protocol_data = FileAttachment("./data/protocol.csv").csv()
+var protocol_data = FileAttachment("./data/protocol_data.csv").csv()
+var protocol_name = FileAttachment("./data/protocol_name.csv").csv()
 import * as Plot from "npm:@observablehq/plot";
 import {require} from "npm:d3-require";
 import papaparse from "https://cdn.skypack.dev/papaparse@5.3.2";
 ```
 
+```js
+const protocol = view(
+  Inputs.select(
+    protocol_name.columns.map((name) => ({name: name})), // Map each name to an object with a name property
+    {
+      label: "Protocol",
+      value: (d) => d.name, // Use the name property for the value
+      format: (d) => d.name, // Use the name property for the display format
+      sort: true,
+      unique: true
+    }
+  )
+)
+```
 
 ```js
 const dfd = require("danfojs@1.1.2/lib/bundle.js").catch(() => {
@@ -15,9 +32,8 @@ const dfd = require("danfojs@1.1.2/lib/bundle.js").catch(() => {
 })
 ```
 
-
 ```js
-const topX = 5
+const topX = 20
 ```
 
 ```js
@@ -50,56 +66,22 @@ const processed_data = await aggregateAndVisualize(protocol_data);
 Plot.plot({
   title: "Token Value Locked Over Time",
   marks: [
-    Plot.stackY(
-      Plot.groupX(
-        {
-          y: "sum",
-          fill: "token_name",
-          order: "appearance"
-        },
-        Plot.groupZ(
-          {
-            y: "sum",
-            fill: (d) => (d.token_name === "Other" ? "Other" : d.token_name),
-            order: "appearance"
-          },
-          Plot.groupZ(
-            {
-              reduce: (group) => {
-                const topXGroups = Array.from(group)
-                  .sort((a, b) => d3.descending(a[1].usd, b[1].usd))
-                  .slice(0, topX)
-                  .map(([key]) => key);
-                return group.map(([key, value]) => [
-                  topXGroups.includes(key) ? key : "Other",
-                  value
-                ]);
-              },
-              y: "sum"
-            },
-            Plot.group(protocol_data, {
-              key: (d) => d.token_name,
-              value: (d) => ({ usd: +d.usd })
-            })
-          )
-        )
-      ),
-      Plot.areaY({
-        x: "aggregated_date",
-        y: "usd",
-        fill: "token_name",
-        order: "appearance"
-      })
-    ),
+    Plot.areaY(processed_data, Plot.stackY({
+      x: "aggregated_date", 
+      y: "usd_sum", // Correct field for USD amount
+      fill: "token_name", // Color by token name
+      order: "appearance" // Order by appearance for clarity
+    })),
     Plot.ruleY([0])
   ],
   color: {
-    legend: true,
-    range: d3.schemeTableau10
+    legend: true, 
+    domain: processed_data.map(d => d.token_name), 
+    range: d3.schemeTableau20
   },
   x: {
     label: "Date",
-    type: "utc",
+    type: "utc", // Assuming dates are in UTC format
     grid: true
   },
   y: {
@@ -108,7 +90,18 @@ Plot.plot({
   },
   width: 800,
   height: 400
-});
+})
+```
+
+
+
+
+## Debugging Purposes
+
+The protocol name is 
+
+```js
+display(protocol_name)
 ```
 
 The protocol_data is 

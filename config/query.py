@@ -237,8 +237,9 @@ class BigQueryClient:
         # Execute the query and return the DataFrame
         return self._execute_query(query)
     
-    def get_unique_token_names(self, table: str) -> pd.DataFrame:
+    def get_unique_token_names(self, table: str = TABLES['C']) -> pd.DataFrame:
         """Fetch unique token names from a specified table."""
+        table = self._get_table_name(TABLES['C'])
         query = f"SELECT DISTINCT token_name FROM {self._get_table_name(table)}"
         try:
             return self._execute_query(query)
@@ -257,7 +258,19 @@ class BigQueryClient:
         ORDER BY frequency DESC
         """
         return self._execute_query(query)
-
+    
+    def get_unique_protocol_names(self) -> pd.DataFrame:
+        """Fetch unique protocol names from table A, ranked by market cap (mcap)."""
+        table_name = self._get_table_name(TABLES['A'])
+        # Adjust the query to order by mcap in descending order and include the mcap column
+        query = f"SELECT DISTINCT name, mcap FROM {self._get_table_name(table_name)} ORDER BY mcap DESC"
+        try:
+            return self._execute_query(query)
+        except exceptions.BadRequest as e:
+            if 'name' in str(e) or 'mcap' in str(e):
+                raise ValueError("Error in querying table A: " + str(e)) from e
+            else:
+                raise
 
 class MotherduckClient(BigQueryClient):
     def __init__(self) -> None:
@@ -409,3 +422,4 @@ class MotherduckClient(BigQueryClient):
         """Retrieve data for a specific protocol with granularity, calculating the average of sums."""
         query = self._get_aggregated_data(TABLES['C'], granularity=granularity, protocol_name=protocol_name)
         return self._execute_query(query)
+    

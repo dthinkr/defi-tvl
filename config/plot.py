@@ -68,7 +68,6 @@ class NetworkVisualizer:
         normalized = (size - min_size) / (max_size - min_size) if max_size > min_size else 1
         return normalized * (max_visual - min_visual) + min_visual
 
-
     def visualize_network(self, network_json, category_colors=None):
         # Default color for nodes if category_colors is not provided or a category is missing
         default_color = "#999999"  # Example gray color, adjust as needed
