@@ -1,8 +1,10 @@
-from fastapi import FastAPI, HTTPException, Query, Path
+from fastapi import FastAPI, HTTPException, Query, Path, Response
 from config.etl_network import ETLNetwork
 from config.query import MotherduckClient
 from fastapi.responses import HTMLResponse
 from config.plot import NetworkVisualizer
+import aioredis
+
 
 app = FastAPI()
 
@@ -37,7 +39,8 @@ async def token_distribution(token_name: str, granularity: str):
     """
     try:
         df = bq.get_token_distribution(token_name, granularity)
-        return df.to_json(orient='records')
+        csv_data = df.to_csv(index=False)
+        return Response(content=csv_data, media_type="text/csv")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -48,7 +51,8 @@ async def protocol_data(protocol_name: str, granularity: str):
     """
     try:
         df = bq.get_protocol_data(protocol_name, granularity)
-        return df.to_json(orient='records')
+        csv_data = df.to_csv(index=False)
+        return Response(content=csv_data, media_type="text/csv")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
