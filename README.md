@@ -17,8 +17,6 @@ This is a state (heatmap) of all historical tvl states acrossj all protocols.
 - light: data is present
   ![Protocol Activity Heatmap](data/protocol_activity_heatmap.png)
 
-![Database Schema](data/tvl/db/db_schema.png)
-
-## How to Use
+How to Use
 
 [Link to visualization app](https://defi-tvl.streamlit.app/)
