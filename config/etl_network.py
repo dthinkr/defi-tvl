@@ -6,6 +6,7 @@ import pandas as pd
 import json
 import numpy as np
 import os
+import dask.dataframe as dd
 
 class ETLNetwork:
     def __init__(self, bq):
@@ -190,7 +191,6 @@ class ETLNetwork:
 
         self._save_json(id_to_info, 'id_to_info.json')
 
-
     def _process_edges(self, links):
         edge_aggregate = {}
         for link in links:
@@ -201,25 +201,13 @@ class ETLNetwork:
 
         return final_links
 
-
     def process_dataframe(self, C: pd.DataFrame, TOP_X: int = None, mode: str = 'usd', type: bool = False):
-        """
-        Processes a DataFrame to map tokens to protocols, adjust transaction flows, and prepare the data for visualization.
 
-        This method takes a DataFrame containing transaction data and performs several steps to prepare it for analysis
-        and visualization. It maps tokens to protocols using the internal mappings, adjusts the 'from' and 'to' columns
-        based on the direction of the USD change, calculates the absolute values of quantity and USD changes, and replaces
-        token IDs with their names for readability. The processed DataFrame is then ready for further analysis or to be
-        used as input for generating network visualizations.
+        print('enter preprocessing')
 
-        Parameters:
-        - C (pd.DataFrame): The DataFrame to be processed, containing transaction data including token names, USD changes, and quantities.
+        if TOP_X != None:
+            raise NotImplementedError("TOP_X is not implemented yet")
 
-        Returns:
-        - pd.DataFrame: The processed DataFrame with tokens mapped to protocols, adjusted transaction flows, and other necessary transformations applied.
-
-        The method ensures that the data is in a consistent format, with token names and protocol mappings that are clear and understandable.
-        """
         # Initialize the new columns with NaNs or zeros
         C['qty_from'] = C['qty_to'] = C['usd_from'] = C['usd_to'] = None
 
@@ -257,10 +245,6 @@ class ETLNetwork:
         C['from_node'] = C['from_node'].apply(replace_with_name)
         C['to_node'] = C['to_node'].apply(replace_with_name)
 
-        # Dynamically select columns based on the mode using f-strings
-        change_column = f'{mode}_change'
-        from_column = f'{mode}_from'
-        to_column = f'{mode}_to'
 
         def get_category(node_name):
             for id, info in self.id_to_info.items():
@@ -270,61 +254,71 @@ class ETLNetwork:
             if node_name.isdigit() or node_name == '3594':  # You can add more conditions here
                 return 'AGGREGATED'
             return node_name  # Return node_name if it doesn't match any special conditions
-
-        # Calculate the total change for each node
-        total_change_per_node = C.groupby('from_node')[change_column].sum().add(
-            C.groupby('to_node')[change_column].sum(), fill_value=0
-        )
-
-        if TOP_X is not None and TOP_X > 0:
-            top_X_nodes = total_change_per_node.sort_values(ascending=False).head(TOP_X).index
-            C['from_node'] = C['from_node'].apply(lambda x: x if x in top_X_nodes else 'AGGREGATED')
-            C['to_node'] = C['to_node'].apply(lambda x: x if x in top_X_nodes else 'AGGREGATED')
-
-            node_sizes = C.groupby('from_node')[from_column].sum().add(
-                C.groupby('to_node')[to_column].sum(), fill_value=0
-            )
+        
 
         if type:
-            C['from_node_category'] = C['from_node'].apply(get_category)
-            C['to_node_category'] = C['to_node'].apply(get_category)
 
-            category_change = C.groupby(C['from_node_category'])[change_column].sum().add(
-                C.groupby(C['to_node_category'])[change_column].sum(), fill_value=0
-            )
+            C = dd.from_pandas(C, npartitions=8)
 
-            nodes = [{'id': category, 'size': size, 'category': category} for category, size in category_change.items()]
+            C['from_node_category'] = C['from_node'].apply(get_category, meta=('from_node', 'object'))
+            C['to_node_category'] = C['to_node'].apply(get_category, meta=('to_node', 'object'))
 
+            C = C.compute()
+            C = C.replace({pd.NA: None})
+
+            # Convert columns to numeric, ensuring `None` values are handled
+            C['qty_from'] = pd.to_numeric(C['qty_from'], errors='coerce').fillna(0)
+            C['qty_to'] = pd.to_numeric(C['qty_to'], errors='coerce').fillna(0)
+            C['usd_from'] = pd.to_numeric(C['usd_from'], errors='coerce').fillna(0)
+            C['usd_to'] = pd.to_numeric(C['usd_to'], errors='coerce').fillna(0)
+
+            # C['from_node_category'] = C['from_node'].apply(get_category)
+            # C['to_node_category'] = C['to_node'].apply(get_category)
+
+            print("step 1")
+
+            # Initialize a dictionary to hold the total values for each category, starting with 0
+            category_values = {category: 0 for category in set(C['from_node_category']).union(set(C['to_node_category']))}
+            
+            print(C.head())
+            # Choose the mode: 'usd' or 'qty'
+            value_column_from = 'usd_from' if mode == 'usd' else 'qty_from'
+            value_column_to = 'usd_to' if mode == 'usd' else 'qty_to'
+
+            # Aggregate 'from_value' and 'to_value' for each category
+            from_aggregation = C.groupby('from_node_category')[value_column_from].sum().fillna(0)
+            to_aggregation = C.groupby('to_node_category')[value_column_to].sum().fillna(0)
+
+            # Combine the aggregations
+            category_values_aggregate = from_aggregation.add(to_aggregation, fill_value=0)
+
+            print("step 2")
+
+
+            # Ensure all categories are included, even those without transactions
+            all_categories = set(C['from_node_category']).union(set(C['to_node_category']))
+            category_values = {category: 0 for category in all_categories}  # Initialize all to 0
+
+            # Update the dictionary with aggregated values
+            for category in category_values_aggregate.index:
+                category_values[category] += category_values_aggregate[category]
+
+            print('step 3')
+
+            # Generate nodes with their sizes based on the aggregated values
+            nodes = [{'id': category, 'size': size, 'category': category} for category, size in category_values.items()]
+
+            # Generate links as before
             links = []
             for (from_cat, to_cat), group in C.groupby(['from_node_category', 'to_node_category']):
-                size = group[change_column].sum()
+                size = group['usd_change'].sum() if mode == 'usd' else group['qty_change'].sum()
                 links.append({'source': from_cat, 'target': to_cat, 'size': size, 'chain': 'aggregated'})
 
             # Handling self-links for within-category transfers
-            for category in category_change.keys():
-                within_category_size = C[(C['from_node_category'] == category) & (C['to_node_category'] == category)][change_column].sum()
+            for category in category_values.keys():
+                within_category_size = C[(C['from_node_category'] == category) & (C['to_node_category'] == category)]['usd_change'].sum() if mode == 'usd' else C[(C['from_node_category'] == category) & (C['to_node_category'] == category)]['qty_change'].sum()
                 if within_category_size != 0:
                     links.append({'source': category, 'target': category, 'size': within_category_size, 'chain': 'aggregated'})
-
-        else:
-            # Adjusted else logic to include aggregated nodes and a single self-directed edge
-            node_sizes = C.groupby('from_node')[from_column].sum().add(
-                C.groupby('to_node')[to_column].sum(), fill_value=0
-            )
-
-            nodes = [{'id': node, 'size': size, 'category': get_category(node)} for node, size in node_sizes.items() if node != 'AGGREGATED' or (node == 'AGGREGATED' and size > 0)]
-
-            # Prepare links, including a single aggregated self-link if applicable
-            aggregated_size_within = C[(C['from_node'] == 'AGGREGATED') & (C['to_node'] == 'AGGREGATED')][change_column].sum()
-            links = C[(C['from_node'] != 'AGGREGATED') | (C['to_node'] != 'AGGREGATED')].apply(lambda row: {
-                'source': row['from_node'],
-                'target': row['to_node'],
-                'chain': row['chain_name'],
-                'size': row[change_column]
-            }, axis=1).tolist()
-
-            if aggregated_size_within != 0:
-                links.append({'source': 'AGGREGATED', 'target': 'AGGREGATED', 'size': aggregated_size_within, 'chain': 'aggregated'})
 
 
         network_json = {
