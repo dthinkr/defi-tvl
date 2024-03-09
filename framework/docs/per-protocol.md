@@ -1,4 +1,4 @@
-# TVL Per Protocol (Static)
+# TVL Per Protocol
 
 ```js
 var protocol_data = FileAttachment("./data/protocol_data.csv").csv()

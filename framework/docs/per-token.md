@@ -1,10 +1,9 @@
-# TVL Per Token (Static)
+# TVL Per Token
 
 ```js
 var token_data = FileAttachment("./data/token_data.csv").csv()
 var flare = FileAttachment("./data/flare.json").json()
 import { require } from "npm:d3-require";
-const d3 = require("d3@7");
 const d3Hierarchy = require("d3-hierarchy");
 const d3Scale = require("d3-scale");
 const d3ScaleChromatic = require("d3-scale-chromatic");
@@ -26,7 +25,13 @@ function area(data) {
     const totalWidth = width; 
     const totalHeight = height + legendHeight;
     const textSize = "12px";
-    const minAreaForText = 4000;
+    const minAreaForText = 12000;
+    const tableau20 = [
+    "#e15759", "#edc948", "#f28e2b", "#76b7b2", "#59a14f",
+    "#b07aa1", "#ff9da7", "#9c755f", "#bab0ac", "#4e79a7", 
+    "#d37295", "#fabfd2", "#b6992d", "#499894", "#86bcb6",
+    "#f56476", "#a3a500", "#dcb0f2", "#882e72", "#9fd077"
+    ];
 
     // Helper function to format large numbers
     const format = d => `${formatValue(d).replace('G', 'B')}`;
@@ -46,7 +51,8 @@ function area(data) {
     clusterMap.get(clusterKey).children.push({
         name: d.protocol_name,
         value: d.usd,
-        aggregated_date: d.aggregated_date
+        aggregated_date: d.aggregated_date,
+        chain_name: d.chain_name
     });
     });
 
@@ -76,7 +82,7 @@ function area(data) {
     });
 
     // Specify the color scale.
-    const color = d3.scaleOrdinal(rootData.children.map(d => d.name), d3.schemeTableau10);
+    const color = d3.scaleOrdinal(rootData.children.map(d => d.name), tableau20);
     // Compute the layout.
     const root = d3.treemap()
         .tile(d3.treemapSquarify) // or use another tiling method
@@ -136,32 +142,53 @@ function area(data) {
         .attr("font-size", textSize)
         .attr("fill", "black");
 
+    leaf.append("text")
+        .attr("x", 10)
+        .attr("y", 65) // Adjust this value based on your layout needs
+        .filter(d => (d.x1 - d.x0) * (d.y1 - d.y0) >= minAreaForText) // Check if the area is above the threshold
+        .text(d => d.data.chain_name) // Assuming 'aggregated_date' is the property name
+        .attr("font-size", textSize)
+        .attr("fill", "black");
+
     // Create the legend
+    const itemsPerLine = Math.ceil(color.domain().length / 3); // Assuming you want 3 lines
+    const legendSpacing = 25; // Vertical spacing between lines
+    const itemWidth = 250; // Horizontal space each item takes
+    const rightMargin = 20;
+    const legendXPosition = totalWidth - rightMargin;
+
     const legend = svg.append("g")
-        .attr("transform", `translate(150, ${height+3})`)  // Adjust translation to fit the legendWidth
+        .attr("transform", `translate(${legendXPosition}, ${height+3})`) // Adjust to align right
         .attr("text-anchor", "end")
         .selectAll("g")
         .data(color.domain().slice().reverse())
-        .join("g")
-            .attr("transform", (d, i) => `translate(${i * 330}, 0)`);  // Translate horizontally
-    
+        .join("g");
+
+    legend.attr("transform", (d, i) => {
+        const line = Math.floor(i / itemsPerLine); // Determine the line number
+        const x = -(i % itemsPerLine) * itemWidth; // Adjust x position for right alignment
+        const y = line * legendSpacing; // Adjust vertical position based on line number
+        return `translate(${x}, ${y})`;
+    });
+
+    // Continue with appending rects and texts to each legend item as before
     legend.append("rect")
-        .attr("y", 0)  // Adjust y to 0
+        .attr("y", 0)
         .attr("width", 19)
         .attr("height", 19)
         .attr("fill", color);
-    
+
     legend.append("text")
-        .attr("y", 14.5)   // Adjust y to middle of rectangle
+        .attr("x", -5) // Adjust x position to align text next to the rectangle
+        .attr("y", 9.5) // Center text vertically with the rectangle
         .attr("dy", "0.35em")
-        .text(d => d)
-        .attr("font-size", textSize);
+        .text(d => d);
 
     return svg.node();
 }
 ```
 
-This displays the token data at 
+This displays the most recent token data 
 
 ```js
 display(area(token_data));
