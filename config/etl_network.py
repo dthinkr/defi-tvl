@@ -7,6 +7,12 @@ import json
 import numpy as np
 import os
 import dask.dataframe as dd
+import os
+
+try:
+    NUM_CORES = max(1, int(os.cpu_count() * 0.8))
+except:
+    NUM_CORES = 1
 
 class ETLNetwork:
     def __init__(self, bq):
@@ -203,8 +209,6 @@ class ETLNetwork:
 
     def process_dataframe(self, C: pd.DataFrame, TOP_X: int = None, mode: str = 'usd', type: bool = False):
 
-        print('enter preprocessing')
-
         if TOP_X != None:
             raise NotImplementedError("TOP_X is not implemented yet")
 
@@ -258,7 +262,7 @@ class ETLNetwork:
 
         if type:
 
-            C = dd.from_pandas(C, npartitions=8)
+            C = dd.from_pandas(C, npartitions=NUM_CORES)
 
             C['from_node_category'] = C['from_node'].apply(get_category, meta=('from_node', 'object'))
             C['to_node_category'] = C['to_node'].apply(get_category, meta=('to_node', 'object'))
@@ -275,12 +279,9 @@ class ETLNetwork:
             # C['from_node_category'] = C['from_node'].apply(get_category)
             # C['to_node_category'] = C['to_node'].apply(get_category)
 
-            print("step 1")
-
             # Initialize a dictionary to hold the total values for each category, starting with 0
             category_values = {category: 0 for category in set(C['from_node_category']).union(set(C['to_node_category']))}
             
-            print(C.head())
             # Choose the mode: 'usd' or 'qty'
             value_column_from = 'usd_from' if mode == 'usd' else 'qty_from'
             value_column_to = 'usd_to' if mode == 'usd' else 'qty_to'
@@ -292,8 +293,6 @@ class ETLNetwork:
             # Combine the aggregations
             category_values_aggregate = from_aggregation.add(to_aggregation, fill_value=0)
 
-            print("step 2")
-
 
             # Ensure all categories are included, even those without transactions
             all_categories = set(C['from_node_category']).union(set(C['to_node_category']))
@@ -303,7 +302,6 @@ class ETLNetwork:
             for category in category_values_aggregate.index:
                 category_values[category] += category_values_aggregate[category]
 
-            print('step 3')
 
             # Generate nodes with their sizes based on the aggregated values
             nodes = [{'id': category, 'size': size, 'category': category} for category, size in category_values.items()]
