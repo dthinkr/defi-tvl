@@ -26,7 +26,7 @@ async def get_network_json(
     """
     try:
         C = bq.compare_periods(date_input, granularity=granularity)
-        print(C.head(1))
+        # print(C.head(1))
         network_json = etl_network.process_dataframe(C, TOP_X=TOP_X, mode=mode, type=type)
         return network_json
     except Exception as e:

@@ -93,18 +93,15 @@ Plot.plot({
 })
 ```
 
+## Debugging
 
-
-
-## Debugging Purposes
-
-The protocol name is 
+The protocol name is
 
 ```js
 display(protocol_name)
 ```
 
-The protocol_data is 
+The protocol_data is
 
 ```js
 Inputs.table(protocol_data);
@@ -113,9 +110,7 @@ display(protocol_data)
 
 The processed_data is
 
-
 ```js
 Inputs.table(processed_data);
 display(processed_data);
 ```
-
