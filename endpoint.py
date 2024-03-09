@@ -15,7 +15,7 @@ etl_network = ETLNetwork(bq=bq)
 @app.get("/network-json/{date_input}", summary="Network Data")
 async def get_network_json(
     date_input: str = Path(..., description="Date in 'YYYY-MM-DD' format."),
-    TOP_X: int = Query(50, description="Number of top connections."),
+    TOP_X: int = Query(None, description="Number of top connections."),
     granularity: str = Query('daily', description=", 'daily', 'monthly', 'yearly'."),
     mode: str = Query('usd', description="'usd' or 'qty'."),
     type: bool = Query(False, description="Aggregate by type.")

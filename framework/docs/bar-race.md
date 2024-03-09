@@ -1,46 +1,34 @@
 # TVL Bar Race 
 ```js
 import { require } from "npm:d3-require";
-const d3 = require("d3@5", "d3-array@2");
+import * as d3 from "npm:d3";
+import {csv, json} from "npm:d3-fetch";
 const data2 = FileAttachment("./data/category-brands.csv").csv();
 ```
 
 
-<!-- ```js
-const colorView = html`<input type="color" value="#ff0000">`;
-const colorValue = Generators.input(colorView)
-display(colorView);
-display(colorValue)
-``` -->
-
-<!-- this does not fit the javascript context, there is no viewof here -->
-
-this is the beginning
 
 ```js
 const temp = Scrubber(keyframes, {
-//   format: ([date]) => formatDate(date),
+  // format: ([date]) => formatDate(date),
   delay: duration,
   loop: false
 });
-document.body.appendChild(temp); // Or append to another element of your choice
+
+document.body.appendChild(temp); // Or append to another specific element if needed
+
+let keyframe; // This will hold the current value of the scrubber
+
+// Assuming the scrubber emits 'input' events and its value is accessible via `value` property
+temp.addEventListener('input', () => {
+  keyframe = temp.value; // Update the variable based on the scrubber's current value
+  // Optionally, trigger any updates that depend on `keyframe`
+});
+
+display(temp);
+display(keyframe);
 ```
 
-```js 
-const keyframe = Generators.input(temp)
-```
-
-temp is
-
-```js
-display(temp)
-```
-
-keyframe is 
-
-```js
-display(keyframe)
-```
 
 ```js
 function chart() {
@@ -320,7 +308,6 @@ const duration = 250;
 const n = 100;
 const names = new Set(data.map(d => d.name));
 const k = 10;
-
 
 // const nameframes = d3.groups(keyframes.flatMap(([, data]) => data), d => d.name);
 var parseNumber = string => +string.replace(/,/g, "");

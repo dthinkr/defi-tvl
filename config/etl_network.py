@@ -202,7 +202,7 @@ class ETLNetwork:
         return final_links
 
 
-    def process_dataframe(self, C: pd.DataFrame, TOP_X: int = 50, mode: str = 'usd', type: bool = False):
+    def process_dataframe(self, C: pd.DataFrame, TOP_X: int = None, mode: str = 'usd', type: bool = False):
         """
         Processes a DataFrame to map tokens to protocols, adjust transaction flows, and prepare the data for visualization.
 
