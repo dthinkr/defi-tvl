@@ -303,6 +303,9 @@ class MotherduckClient(BigQueryClient):
         return expressions.get(granularity, f"Unsupported granularity: {granularity}")
     
     def compare_periods(self, input_date: str, granularity: str) -> pd.DataFrame:
+        """TODO: NEEDS FIXING. LOSES MOST TOKEN DATA FOR UNKNOWN REASON. 
+                    NEED TO CHECK AGGREGATE FUNCTION FIRST."""
+
         parsed_date = parse(input_date)
         start_date = datetime(parsed_date.year, parsed_date.month, parsed_date.day)
 
@@ -317,13 +320,12 @@ class MotherduckClient(BigQueryClient):
         else:
             raise ValueError(f"Unsupported granularity: {granularity}")
         
-
         # Format dates as strings for use in queries
         start_date = start_date.strftime('%Y-%m-%d')
         end_date = end_date.strftime('%Y-%m-%d')
         
         """TODO: DOES NOT WORK FOR WEEKLY GRANULARITY. """
-        query = self._get_aggregated_data(TABLES['C'], granularity, start_date=start_date, end_date=end_date, edge_dates_only=False)
+        query = self._get_aggregated_data(TABLES['C'], granularity, start_date=start_date, end_date=end_date, edge_dates_only=True)
         df = self._execute_query(query)
 
         df.sort_values(by=['id', 'chain_name', 'token_name', 'aggregated_date'], inplace=True)

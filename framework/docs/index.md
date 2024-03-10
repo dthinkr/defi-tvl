@@ -4,6 +4,11 @@ toc: false
 
 <style>
 
+:root {
+  --theme-foreground-focus: #ffb71a; /* New red color */
+  /* --theme-foreground-muted: #ffb71a; Softer red */
+}
+
 .hero {
   display: flex;
   flex-direction: column;
@@ -20,7 +25,7 @@ toc: false
   font-size: 14vw;
   font-weight: 900;
   line-height: 1;
-  background: linear-gradient(30deg, var(--theme-foreground-focus), currentColor);
+  background: linear-gradient(0deg, var(--theme-foreground-focus), currentColor);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -45,48 +50,54 @@ toc: false
 </style>
 
 <div class="hero">
-  <h1>Hello, Observable Framework</h1>
-  <h2>Welcome to your new project! Edit&nbsp;<code style="font-size: 90%;">docs/index.md</code> to change this page.</h2>
-  <a href="https://observablehq.com/framework/getting-started" target="_blank">Get started<span style="display: inline-block; margin-left: 0.25rem;">↗︎</span></a>
+  <h1>TVL Data</h1>
+  <h2>A set of data dashboards for DeFi protocols and tokens.</h2>
+  <a href="https://defillama.com/" target="_blank">Source<span style="display: inline-block; margin-left: 0.25rem;">↗︎</span></a>
 </div>
 
 <div class="grid grid-cols-2" style="grid-auto-rows: 504px;">
   <div class="card">${
     resize((width) => Plot.plot({
-      title: "Your awesomeness over time 🚀",
-      subtitle: "Up and to the right!",
+      title: "Historical TVL",
+      subtitle: "$ billions",
       width,
-      y: {grid: true, label: "Awesomeness"},
+      y: {grid: true, label: "Ethereum"},
+      x: {
+        tickFormat: d3.timeFormat("%Y"),
+      },
       marks: [
         Plot.ruleY([0]),
-        Plot.lineY(aapl, {x: "Date", y: "Close", tip: true})
+        Plot.lineY(eth.map(d => ({...d, tvl: d.tvl / 1e9})), {x: "date", y: "tvl", tip: true})
       ]
     }))
   }</div>
-  <div class="card">${
-    resize((width) => Plot.plot({
-      title: "How big are penguins, anyway? 🐧",
-      width,
-      grid: true,
-      x: {label: "Body mass (g)"},
-      y: {label: "Flipper length (mm)"},
-      color: {legend: true},
-      marks: [
-        Plot.linearRegressionY(penguins, {x: "body_mass_g", y: "flipper_length_mm", stroke: "species"}),
-        Plot.dot(penguins, {x: "body_mass_g", y: "flipper_length_mm", stroke: "species", tip: true})
-      ]
-    }))
-  }</div>
+
+
+<div class="card">    
+<h2>TVL Transfer Intensity in 2023</h2>
+    <h3>$ billions</h3>
+    ${Plot.cell(all.filter(d => {
+      const date = new Date(d.date); // Directly use YMD string to create a Date object
+      return date.getFullYear() === 2023;
+    }), {x: (d) => {
+      const date = new Date(d.date);
+      return date.getUTCDate();
+    }, y: (d) => {
+      const date = new Date(d.date);
+      return date.getUTCMonth();
+    }, fill: "tvl", tip: true, inset: 0.5}).plot({marginTop: 0, marginBottom: -50, padding: 0, height: 640})}
+</div>
 </div>
 
+
 ```js
-const aapl = FileAttachment("aapl.csv").csv({typed: true});
-const penguins = FileAttachment("penguins.csv").csv({typed: true});
+const eth = FileAttachment("./data/frontpage_line.csv").csv({typed: true});
+const all = FileAttachment("./data/frontpage_heat.csv").csv({typed: true});
 ```
 
 ---
 
-## Next steps
+<!-- ## Next steps
 
 Here are some ideas of things you could try…
 
@@ -112,4 +123,4 @@ Here are some ideas of things you could try…
   <div class="card">
     Visit <a href="https://github.com/observablehq/framework">Framework on GitHub</a> and give us a star. Or file an issue if you’ve found a bug!
   </div>
-</div>
+</div> -->

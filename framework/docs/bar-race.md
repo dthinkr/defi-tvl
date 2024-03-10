@@ -1,12 +1,10 @@
-# TVL Bar Race 
+# TVL Bar Race (TODO)
 ```js
 import { require } from "npm:d3-require";
 import * as d3 from "npm:d3";
 import {csv, json} from "npm:d3-fetch";
 const data2 = FileAttachment("./data/category-brands.csv").csv();
 ```
-
-
 
 ```js
 const temp = Scrubber(keyframes, {
