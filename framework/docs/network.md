@@ -104,6 +104,7 @@ const drag = simulation => {
       .on("drag", dragged)
       .on("end", dragended);
 };
+
 const zoom = container => {
   function zoomed(event, d) {
       container.attr("transform", "translate(" + event.transform.x + ", " + event.transform.y + ") scale(" + event.transform.k + ")");
