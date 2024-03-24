@@ -15,6 +15,12 @@ from config.query import MotherduckClient
 from config.plot import save_heatmap
 
 
+from prefect.infrastructure import Process
+
+process_block = Process(env={"PREFECT_LOGGING_LEVEL": "DEBUG"})
+process_block.save("prod", overwrite=True)
+
+
 def load_config():
     with open("config.yaml", "r") as file:
         return yaml.safe_load(file)
@@ -124,20 +130,27 @@ def extract_token_tvl(file_path):
             date = usd_entry["date"]
             for token_name, value_usd in usd_entry["tokens"].items():
                 quantity = quantity_entry["tokens"].get(token_name, 0)
+                # large int handling
+                value_usd_str = str(value_usd)
+                quantity_str = str(quantity)
                 results.append(
                     {
                         "id": data["id"],
                         "chain_name": chain_name,
                         "date": date,
                         "token_name": token_name,
-                        "quantity": quantity,
-                        "value_usd": value_usd,
+                        "quantity": quantity_str,
+                        "value_usd": value_usd_str,
                     }
                 )
 
     df = pl.DataFrame(results)
-    df = df.with_columns(pl.col("quantity").cast(pl.Float64))
-    df = df.with_columns(pl.col("value_usd").cast(pl.Float64))
+
+    # convert large int back
+    if "quantity" in df.columns:
+        df = df.with_columns(pl.col("quantity").cast(pl.Float64).fill_null(0))
+    if "value_usd" in df.columns:
+        df = df.with_columns(pl.col("value_usd").cast(pl.Float64).fill_null(0))
 
     return df
 
@@ -154,12 +167,17 @@ async def process_and_filter_file(con, json_file_path, parquet_file_path, latest
         if not filtered_rows.is_empty():
             filtered_rows.write_parquet(parquet_file_path)
             await upload_df_to_motherduck.fn(parquet_file_path, TABLES["C"], con)
-            get_run_logger().info(f"New data for {json_file_path}")
+            get_run_logger().warning(
+                "Uploading %s lines of new data for %s",
+                filtered_rows.shape[0],
+                json_file_path,
+            )
             os.remove(parquet_file_path)
         else:
-            get_run_logger().warning(f"No new data to process for {json_file_path}.")
+            # get_run_logger().warning("No new data to process for %s.", json_file_path)
+            pass
     else:
-        get_run_logger().warning(f"No data found in original data {json_file_path}.")
+        get_run_logger().critical("No data found in llama data %s.", json_file_path)
 
 
 async def clear_motherduck_table(tables: list, delete_tables: list = None):
@@ -233,7 +251,7 @@ def _calculate_concurrent_tasks(
     return max_concurrent_tasks_based_on_memory
 
 
-def generate_and_save_heatmap():
+def _generate_and_save_heatmap():
     con = duckdb.connect(f"md:?motherduck_token={MD_TOKEN}")
 
     query = """
@@ -257,7 +275,7 @@ def generate_and_save_heatmap():
 
 
 @task
-async def get_latest_dates_for_tokens():
+async def _get_latest_dates_for_tokens():
     con = duckdb.connect(f"md:?motherduck_token={MD_TOKEN}")
     query = """
     SELECT id, chain_name, token_name, MAX(date) as latest_date
@@ -266,9 +284,9 @@ async def get_latest_dates_for_tokens():
     """.format(
         table_name=TABLES["C"]
     )
-    df = con.execute(query).fetchdf()  # Fetch the result as a pandas DataFrame
+    df = con.execute(query).fetchdf()
     con.close()
-    latest_dates_df = pl.from_pandas(df)  # Convert pandas DataFrame to Polars DataFrame
+    latest_dates_df = pl.from_pandas(df)
     get_run_logger().info("Fetched latest dates for tokens.")
     return latest_dates_df
 
@@ -277,7 +295,7 @@ async def get_latest_dates_for_tokens():
 async def llama_ingest():
     await clear_motherduck_table(tables=["A"], delete_tables=["A"])
     await download_protocol_headers()
-    latest_dates = await get_latest_dates_for_tokens()
+    latest_dates = await _get_latest_dates_for_tokens()
 
     all_protocol_slugs = get_all_protocol_slugs()[:MAX_SLUGS]
     max_concurrent_tasks = _calculate_concurrent_tasks()
@@ -296,7 +314,7 @@ async def llama_ingest():
         await asyncio.gather(*tasks)
 
     await update_mapping()
-    generate_and_save_heatmap()
+    _generate_and_save_heatmap()
 
 
 if __name__ == "__main__":
