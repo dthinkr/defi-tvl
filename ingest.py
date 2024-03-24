@@ -14,13 +14,6 @@ from config.etl_network import ETLNetwork
 from config.query import MotherduckClient
 from config.plot import save_heatmap
 
-
-from prefect.infrastructure import Process
-
-process_block = Process(env={"PREFECT_LOGGING_LEVEL": "DEBUG"})
-process_block.save("prod", overwrite=True)
-
-
 def load_config():
     with open("config.yaml", "r") as file:
         return yaml.safe_load(file)
@@ -72,7 +65,9 @@ async def download_protocol_headers():
 @task
 async def add_type_column():
     con = duckdb.connect(f"md:?motherduck_token={MD_TOKEN}")
-    con.execute(f"ALTER TABLE {TABLES['A']} ADD COLUMN IF NOT EXISTS type VARCHAR;")
+    con.execute(
+        f"ALTER TABLE {TABLES['A']} ADD COLUMN IF NOT EXISTS type VARCHAR;"
+    )
 
     category_to_type = {}
     for type_name, categories in CATEGORY_MAPPING.items():
@@ -156,17 +151,23 @@ def extract_token_tvl(file_path):
 
 
 @task
-async def process_and_filter_file(con, json_file_path, parquet_file_path, latest_dates):
+async def process_and_filter_file(
+    con, json_file_path, parquet_file_path, latest_dates
+):
     df = extract_token_tvl(json_file_path)
     if not df.is_empty():
-        df = df.join(latest_dates, on=["id", "chain_name", "token_name"], how="left")
+        df = df.join(
+            latest_dates, on=["id", "chain_name", "token_name"], how="left"
+        )
         filtered_rows = df.filter(pl.col("date") > pl.col("latest_date"))
 
         filtered_rows = filtered_rows.drop("latest_date")
 
         if not filtered_rows.is_empty():
             filtered_rows.write_parquet(parquet_file_path)
-            await upload_df_to_motherduck.fn(parquet_file_path, TABLES["C"], con)
+            await upload_df_to_motherduck.fn(
+                parquet_file_path, TABLES["C"], con
+            )
             get_run_logger().warning(
                 "Uploading %s lines of new data for %s",
                 filtered_rows.shape[0],
@@ -177,7 +178,9 @@ async def process_and_filter_file(con, json_file_path, parquet_file_path, latest
             # get_run_logger().warning("No new data to process for %s.", json_file_path)
             pass
     else:
-        get_run_logger().critical("No data found in llama data %s.", json_file_path)
+        get_run_logger().critical(
+            "No data found in llama data %s.", json_file_path
+        )
 
 
 async def clear_motherduck_table(tables: list, delete_tables: list = None):
@@ -199,7 +202,9 @@ async def clear_motherduck_table(tables: list, delete_tables: list = None):
 
 @task(retries=3, retry_delay_seconds=[1, 10, 100])
 async def upload_df_to_motherduck(
-    file_path, table_name, con=duckdb.connect(f"md:?motherduck_token={MD_TOKEN}")
+    file_path,
+    table_name,
+    con=duckdb.connect(f"md:?motherduck_token={MD_TOKEN}"),
 ):
     exists = con.execute(
         f"SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = '{table_name}')"
@@ -247,7 +252,9 @@ def _calculate_concurrent_tasks(
 ):
     total_memory_gb = _get_system_memory_info_gb()
     usable_memory_gb = total_memory_gb * safety_factor
-    max_concurrent_tasks_based_on_memory = int(usable_memory_gb / memory_per_task_gb)
+    max_concurrent_tasks_based_on_memory = int(
+        usable_memory_gb / memory_per_task_gb
+    )
     return max_concurrent_tasks_based_on_memory
 
 
@@ -315,6 +322,22 @@ async def llama_ingest():
 
     await update_mapping()
     _generate_and_save_heatmap()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 if __name__ == "__main__":
