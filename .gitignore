@@ -4,6 +4,7 @@ key.json
 *.parquet
 *.tmp
 *.html
+*.pdf
 *.pyc
 .*
 __*
@@ -19,3 +20,10 @@ yarn-error.log
 *.json
 *.duckdb
 *.ipynb
+
+# Added by cargo
+
+/target
+
+*.yaml
+*.toml

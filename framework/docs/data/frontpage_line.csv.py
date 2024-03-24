@@ -1,7 +1,6 @@
 import pandas as pd
 import sys
 import requests
-from datetime import datetime
 import numpy as np
 
 def fetch_historical_chain_tvl_to_df(chain):
@@ -16,9 +15,13 @@ def fetch_historical_chain_tvl_to_df(chain):
         return df
     else:
         return None
+    
+def get_data(chain):
+    df = fetch_historical_chain_tvl_to_df(chain)
+    return df
 
 chain = "Ethereum"
-df = fetch_historical_chain_tvl_to_df(chain)
+df = get_data(chain)
 if df is not None:
     sys.stdout.write(df.to_csv(index=False))
 else:

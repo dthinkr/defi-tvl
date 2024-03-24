@@ -4,7 +4,6 @@ import os
 import yaml
 import pickle
 import pandas as pd
-import polars as pl
 from prefect import task, flow, get_run_logger
 from config.config import TABLES, MD_TOKEN, CATEGORY_MAPPING
 import duckdb
@@ -112,10 +111,10 @@ def download_tvl_data():
 
 
 def extract_token_tvl(file_path):
+    results = []
     with open(file_path, "r") as f:
         data = json.load(f)
 
-    results = []
     for chain_name, chain_data in data["chainTvls"].items():
         tokens_usd = chain_data["tokensInUsd"]
         tokens_quantity = chain_data["tokens"]
@@ -125,41 +124,26 @@ def extract_token_tvl(file_path):
             for token_name, value_usd in usd_entry["tokens"].items():
                 quantity = quantity_entry["tokens"].get(token_name, 0)
                 results.append(
-                    {
-                        "id": data["id"],
-                        "chain_name": chain_name,
-                        "date": date,
-                        "token_name": token_name,
-                        "quantity": quantity,
-                        "value_usd": value_usd,
-                    }
+                    [data["id"], chain_name, date, token_name, quantity, value_usd]
                 )
 
-    df = pl.DataFrame(results)
-    df = df.with_columns(pl.col("quantity").cast(pl.Float64))
-    df = df.with_columns(pl.col("value_usd").cast(pl.Float64))
+    df = pd.DataFrame(
+        results,
+        columns=["id", "chain_name", "date", "token_name", "quantity", "value_usd"],
+    )
+    df["quantity"] = df["quantity"].astype("float64")
+    df["value_usd"] = df["value_usd"].astype("float64")
 
     return df
 
 
 @task
-async def process_and_filter_file(con, json_file_path, parquet_file_path, latest_dates):
+async def process_single_file(con, json_file_path, parquet_file_path):
     df = extract_token_tvl(json_file_path)
-    if not df.is_empty():
-        df = df.join(latest_dates, on=["id", "chain_name", "token_name"], how="left")
-        filtered_rows = df.filter(pl.col("date") > pl.col("latest_date"))
-
-        filtered_rows = filtered_rows.drop("latest_date")
-
-        if not filtered_rows.is_empty():
-            filtered_rows.write_parquet(parquet_file_path)
-            await upload_df_to_motherduck.fn(parquet_file_path, TABLES["C"], con)
-            get_run_logger().info(f"New data for {json_file_path}")
-            os.remove(parquet_file_path)
-        else:
-            get_run_logger().warning(f"No new data to process for {json_file_path}.")
-    else:
-        get_run_logger().warning(f"No data found in original data {json_file_path}.")
+    if not df.empty:
+        df.to_parquet(parquet_file_path, index=False)
+        await upload_df_to_motherduck.fn(parquet_file_path, TABLES["C"], con)
+        os.remove(parquet_file_path)
 
 
 async def clear_motherduck_table(tables: list, delete_tables: list = None):
@@ -198,7 +182,7 @@ async def upload_df_to_motherduck(
 
 
 @task
-async def download_and_process_single_protocol(slug, latest_dates):
+async def download_and_process_single_protocol(slug):
     url = f"{BASE_URL}protocol/{slug}"
     data = fetch_data(url)
     if data:
@@ -206,9 +190,7 @@ async def download_and_process_single_protocol(slug, latest_dates):
         json_file_path = os.path.join(DATA_DIR, f"{slug}.json")
         parquet_file_path = os.path.join(DATA_DIR, f"{slug}.parquet")
         save_data_to_file(data, json_file_path)
-        await process_and_filter_file.fn(
-            con, json_file_path, parquet_file_path, latest_dates
-        )
+        await process_single_file.fn(con, json_file_path, parquet_file_path)
         os.remove(json_file_path)
 
 
@@ -256,8 +238,7 @@ def generate_and_save_heatmap():
     save_heatmap(pivot_df)
 
 
-@task
-async def get_latest_dates_for_tokens():
+def get_latest_dates_for_tokens():
     con = duckdb.connect(f"md:?motherduck_token={MD_TOKEN}")
     query = """
     SELECT id, chain_name, token_name, MAX(date) as latest_date
@@ -266,20 +247,19 @@ async def get_latest_dates_for_tokens():
     """.format(
         table_name=TABLES["C"]
     )
-    df = con.execute(query).fetchdf()  # Fetch the result as a pandas DataFrame
+    result = con.execute(query).fetchall()
     con.close()
-    latest_dates_df = pl.from_pandas(df)  # Convert pandas DataFrame to Polars DataFrame
-    get_run_logger().info("Fetched latest dates for tokens.")
-    return latest_dates_df
+
+    latest_dates = {(row[0], row[1], row[2]): row[3] for row in result}
+    return latest_dates
 
 
 @flow
 async def llama_ingest():
-    await clear_motherduck_table(tables=["A"], delete_tables=["A"])
+    await clear_motherduck_table(tables=["A", "C"], delete_tables=["A"])
     await download_protocol_headers()
-    latest_dates = await get_latest_dates_for_tokens()
-
     all_protocol_slugs = get_all_protocol_slugs()[:MAX_SLUGS]
+
     max_concurrent_tasks = _calculate_concurrent_tasks()
     total_slugs_to_process = (
         len(all_protocol_slugs)
@@ -289,13 +269,11 @@ async def llama_ingest():
 
     for i in range(0, total_slugs_to_process, max_concurrent_tasks):
         batch_slugs = all_protocol_slugs[i : i + max_concurrent_tasks]
-        tasks = [
-            download_and_process_single_protocol(slug, latest_dates)
-            for slug in batch_slugs
-        ]
+        tasks = [download_and_process_single_protocol(slug) for slug in batch_slugs]
         await asyncio.gather(*tasks)
 
     await update_mapping()
+
     generate_and_save_heatmap()
 
 
