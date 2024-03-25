@@ -1,5 +1,5 @@
 data_dir: "data/llama"
 base_dir: "data"
 base_url: "https://api.llama.fi/"
-max_slugs: 
+max_slugs: 10
 safety_factor: 0.6
