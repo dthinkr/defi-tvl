@@ -16,7 +16,6 @@ from config.plot import save_heatmap
 from google.cloud import bigquery
 from google.cloud.exceptions import NotFound
 
-########################### PART 1: Llama -> Motherduck
 def load_config():
     with open("config.yaml", "r") as file:
         return yaml.safe_load(file)

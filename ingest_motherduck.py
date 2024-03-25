@@ -16,7 +16,6 @@ from config.plot import save_heatmap
 from google.cloud import bigquery
 from google.cloud.exceptions import NotFound
 
-########################### PART 1: Llama -> Motherduck
 def load_config():
     with open("config.yaml", "r") as file:
         return yaml.safe_load(file)
@@ -64,6 +63,24 @@ async def download_protocol_headers():
     return data
 
 
+@task(retries=3, retry_delay_seconds=[1, 10, 100])
+def download_tvl_data():
+    all_protocol_slugs = get_all_protocol_slugs()
+    if MAX_SLUGS is not None:
+        all_protocol_slugs = all_protocol_slugs[:MAX_SLUGS]
+    failed_slugs = []
+    for protocol in all_protocol_slugs:
+        url = f"{BASE_URL}protocol/{protocol}"
+        data = fetch_data(url)
+        if data:
+            filename = os.path.join(DATA_DIR, f"{protocol}.json")
+            save_data_to_file(data, filename)
+        else:
+            failed_slugs.append(protocol)
+    if failed_slugs:
+        with open(FAILED_SLUGS_FILE, "wb") as f:
+            pickle.dump(failed_slugs, f)
+
 @task
 async def add_type_column():
     con = duckdb.connect(f"md:?motherduck_token={MD_TOKEN}")
@@ -93,25 +110,6 @@ def get_all_protocol_slugs():
     result = con.execute(query).fetchall()
     con.close()
     return [row[0] for row in result]
-
-
-@task(retries=3, retry_delay_seconds=[1, 10, 100])
-def download_tvl_data():
-    all_protocol_slugs = get_all_protocol_slugs()
-    if MAX_SLUGS is not None:
-        all_protocol_slugs = all_protocol_slugs[:MAX_SLUGS]
-    failed_slugs = []
-    for protocol in all_protocol_slugs:
-        url = f"{BASE_URL}protocol/{protocol}"
-        data = fetch_data(url)
-        if data:
-            filename = os.path.join(DATA_DIR, f"{protocol}.json")
-            save_data_to_file(data, filename)
-        else:
-            failed_slugs.append(protocol)
-    if failed_slugs:
-        with open(FAILED_SLUGS_FILE, "wb") as f:
-            pickle.dump(failed_slugs, f)
 
 
 def extract_token_tvl(file_path):
@@ -324,3 +322,6 @@ async def ingest_llama_motherduck():
 
     await update_mapping()
     _generate_and_save_heatmap()
+
+if __name__ == "__main__":
+    asyncio.run(ingest_llama_motherduck())
